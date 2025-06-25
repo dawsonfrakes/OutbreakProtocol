@@ -229,3 +229,12 @@ if __name__ == "__main__":
 		except Token_Error as e: print(f"{file}[{e.location}] token error: {e}"); break
 		except Parse_Error as e: print(f"{file}[{e.token.offset}] parse error: {e}"); break
 		print(s2s.visit(node))
+
+	import ctypes
+	llvmc = ctypes.CDLL("/opt/homebrew/opt/llvm/lib/libLLVM-C.dylib")
+	LLVMContextCreate = llvmc.LLVMContextCreate
+	LLVMContextCreate.restype, *LLVMContextCreate.argtypes = (ctypes.c_void_p,)
+	LLVMContextDispose = llvmc.LLVMContextDispose
+	LLVMContextDispose.restype, *LLVMContextDispose.argtypes = (None, ctypes.c_void_p)
+	ctx = LLVMContextCreate()
+	LLVMContextDispose(ctx)
