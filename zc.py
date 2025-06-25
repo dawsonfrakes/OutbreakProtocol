@@ -74,14 +74,22 @@ class ZUnaryOp(ZNode):
 	op: Token
 	rhs: ZNode
 @dataclass
-class ZBinOp(ZNode):
+class ZBinaryOp(ZNode):
 	lhs: ZNode
 	op: Token
+	rhs: ZNode
+@dataclass
+class ZAssign(ZNode):
+	lhs: ZNode
 	rhs: ZNode
 @dataclass
 class ZCall(ZNode):
 	expr: ZNode
 	args: list[ZNode]
+@dataclass
+class ZAccessor(ZNode):
+	expr: ZNode
+	identifier: ZIdentifier
 
 class Parse_Error(Exception):
 	def __init__(self, message: str, token: Token) -> None:
@@ -122,15 +130,23 @@ class Parser:
 		elif self.peek().kind == Token_Kind.NUMBER:
 			node = ZLiteral(int(self.eat(Token_Kind.NUMBER).text(self.s), base=0))
 		assert node is not None
-		if self.peek().kind == ord("("):
-			self.eat(ord("("))
-			args: list[ZNode] = []
-			while self.peek().kind != ord(")"):
-				args.append(self.parse_expression())
-				if self.peek().kind == ord(","): self.eat(ord(","))
-				else: break
-			self.eat(ord(")"))
-			node = ZCall(node, args)
+		while True:
+			if self.peek().kind == ord("("):
+				self.eat(ord("("))
+				args: list[ZNode] = []
+				while self.peek().kind != ord(")"):
+					args.append(self.parse_expression())
+					if self.peek().kind == ord(","): self.eat(ord(","))
+					else: break
+				self.eat(ord(")"))
+				node = ZCall(node, args)
+				continue
+			if self.peek().kind == ord("."):
+				self.eat(ord("."))
+				identifier = ZIdentifier(self.eat(Token_Kind.IDENTIFIER))
+				node = ZAccessor(node, identifier)
+				continue
+			break
 		return node
 
 	def parse_term(self) -> ZNode:
@@ -138,7 +154,7 @@ class Parser:
 		while self.peek().kind in (ord("*"), ord("/"), ord("%")):
 			op = self.eat(self.peek().kind)
 			rhs = self.parse_factor()
-			node = ZBinOp(node, op, rhs)
+			node = ZBinaryOp(node, op, rhs)
 		return node
 
 	def parse_conjugate(self) -> ZNode:
@@ -146,7 +162,7 @@ class Parser:
 		while self.peek().kind in (ord("+"), ord("-")):
 			op = self.eat(self.peek().kind)
 			rhs = self.parse_term()
-			node = ZBinOp(node, op, rhs)
+			node = ZBinaryOp(node, op, rhs)
 		return node
 
 	def parse_expression(self) -> ZNode:
@@ -154,8 +170,14 @@ class Parser:
 		while self.peek().kind in (Token_Kind.DOUBLE_EQUALS, Token_Kind.NOT_EQUALS):
 			op = self.eat(self.peek().kind)
 			rhs = self.parse_conjugate()
-			node = ZBinOp(node, op, rhs)
+			node = ZBinaryOp(node, op, rhs)
 		return node
+
+	def parse_assignment(self) -> ZAssign:
+		lhs = self.parse_expression()
+		self.eat(ord("="))
+		rhs = self.parse_expression()
+		return ZAssign(lhs, rhs)
 
 	def parse_declaration(self) -> ZDeclaration:
 		identifier = ZIdentifier(self.eat(Token_Kind.IDENTIFIER))
@@ -176,6 +198,8 @@ class Parser:
 		if self.peek().kind == Token_Kind.IDENTIFIER:
 			if self.peek(2).kind == ord(":"):
 				node = self.parse_declaration()
+			else:
+				node = self.parse_assignment()
 		if node is None: node = self.parse_expression()
 		if self.previous_token is None or self.previous_token.kind != ord("}"): self.eat(ord(";"))
 		return node
@@ -188,8 +212,10 @@ class SourceToSource(Visitor):
 	def visit_ZIdentifier(self, node: ZIdentifier) -> str: return node.token.text(self.s)
 	def visit_ZLiteral(self, node: ZLiteral) -> str: return str(node.data)
 	def visit_ZUnaryOp(self, node: ZUnaryOp) -> str: return f"{node.op.text(self.s)}{self.visit(node.rhs)}"
-	def visit_ZBinOp(self, node: ZBinOp) -> str: return f"({self.visit(node.lhs)} {node.op.text(self.s)} {self.visit(node.rhs)})"
+	def visit_ZBinaryOp(self, node: ZBinaryOp) -> str: return f"({self.visit(node.lhs)} {node.op.text(self.s)} {self.visit(node.rhs)})"
 	def visit_ZCall(self, node: ZCall) -> str: return f"{self.visit(node.expr)}({", ".join(map(self.visit, node.args))})"
+	def visit_ZAccessor(self, node: ZAccessor) -> str: return f"{self.visit(node.expr)}.{self.visit(node.identifier)}"
+	def visit_ZAssign(self, node: ZAssign) -> str: return f"{self.visit(node.lhs)} = {self.visit(node.rhs)};"
 	def visit_ZDeclaration(self, node: ZDeclaration) -> str: return f"{self.visit(node.identifier)} :{" " + self.visit(node.type_expr) + (" " if node.value_expr is not None else "") if node.type_expr is not None else ""}{(": " if node.constant else "= ") + self.visit(node.value_expr) if node.value_expr is not None else ""};"
 
 if __name__ == "__main__":
@@ -199,5 +225,7 @@ if __name__ == "__main__":
 	parser = Parser(src)
 	s2s = SourceToSource(src)
 	while parser.peek().kind != Token_Kind.END_OF_INPUT:
-		node = parser.parse_top_level()
+		try: node = parser.parse_top_level()
+		except Token_Error as e: print(f"{file}[{e.location}] token error: {e}"); break
+		except Parse_Error as e: print(f"{file}[{e.token.offset}] parse error: {e}"); break
 		print(s2s.visit(node))
