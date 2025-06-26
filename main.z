@@ -1,5 +1,10 @@
-x : y() = x((5 + 10) * !4, z, ) != y();
-x: y;
-x : x.y.z : y;
-x := y;
-x.y.z = w;
+:: CPU 'AMD64
+
+:: WINAPI (if (== CPU 'X86) 'STDCALL 'C)
+
+:: NoReturn ($type 'NORETURN)
+
+foreign ExitProcess (proto ((: status CUInt)) NoReturn #callconv WINAPI) #library "kernel32"
+
+proc WinMainCRTStartup () NoReturn #callconv WINAPI
+  ExitProcess 0
