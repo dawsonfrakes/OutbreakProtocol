@@ -41,5 +41,5 @@ cat > .build/index.html <<'EOF'
 EOF
 
 case "$1" in
-  run) python3 -m http.server 8080 -d .build & open .build/index.html; wait ;;
+  run) open http://localhost:8080; python3 -m http.server 8080 -d .build ;;
 esac
