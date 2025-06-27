@@ -1,12 +1,35 @@
 from c4.c4 import dtypes, entry, foreign, G, OSs, OS
 
 if OS == OSs.WINDOWS:
-	HINSTANCE = dtypes.Pointer[dtypes.Opaque()]
+	HINSTANCE = dtypes.Pointer[dtypes.Opaque["HINSTANCE"]]
 
 	@foreign("kernel32")
 	def GetModuleHandleW(name: dtypes.CWString) -> HINSTANCE: ...
 	@foreign("kernel32")
 	def ExitProcess(status: dtypes.CUInt) -> dtypes.NoReturn: ...
+
+	HDC = dtypes.Pointer[dtypes.Opaque["HDC"]]
+	HWND = dtypes.Pointer[dtypes.Opaque["HWND"]]
+	HMENU = dtypes.Pointer[dtypes.Opaque["HMENU"]]
+	HICON = dtypes.Pointer[dtypes.Opaque["HICON"]]
+	HBRUSH = dtypes.Pointer[dtypes.Opaque["HBRUSH"]]
+	HCURSOR = dtypes.Pointer[dtypes.Opaque["HCURSOR"]]
+	HMONITOR = dtypes.Pointer[dtypes.Opaque["HMONITOR"]]
+	WNDPROC = dtypes.Procedure[dtypes.SSize, [HWND, dtypes.CUInt, dtypes.USize, dtypes.SSize]]
+	WNDCLASSEXW = dtypes.Struct["WNDCLASSEXW", [
+  	("cbSize", dtypes.CUInt),
+  	("style", dtypes.CUInt),
+  	("lpfnWndProc", WNDPROC),
+  	("cbClsExtra", dtypes.CInt),
+  	("cbWndExtra", dtypes.CInt),
+  	("hInstance", HINSTANCE),
+  	("hIcon", HICON),
+  	("hCursor", HCURSOR),
+  	("hbrBackground", HBRUSH),
+  	("lpszMenuName", dtypes.CWString),
+  	("lpszClassName", dtypes.CWString),
+  	("hIconSm", HICON),
+	]]
 
 	platform_hinstance: HINSTANCE
 
@@ -16,11 +39,15 @@ if OS == OSs.WINDOWS:
 
 		ExitProcess(0)
 elif OS == OSs.DARWIN:
+	STDOUT_FILENO = 1
+
 	@foreign("System", alt_name="write")
-	def sys_write(fd: dtypes.CInt, data: dtypes.Pointer[dtypes.CUChar], size: dtypes.USize) -> dtypes.SSize: ...
+	def sys_write(fd: dtypes.CInt, data: dtypes.CVoidPointer, size: dtypes.USize) -> dtypes.SSize: ...
 	@foreign("System", alt_name="_exit")
 	def sys_exit(status: dtypes.CInt) -> dtypes.NoReturn: ...
 
 	@entry(alt_name="_start")
 	def start() -> dtypes.NoReturn:
+		hw = b"Hello, world!\n"
+		sys_write(STDOUT_FILENO, hw, len(hw))
 		sys_exit(0)
