@@ -1,12 +1,44 @@
 from c4 import dtypes, entry, foreign, G, OSs, OS
 
 if OS == OSs.WINDOWS:
-  type HINSTANCE = dtypes.Pointer[dtypes.Opaque]
+  @opaque()
+  class HINSTANCE: pass
 
   @foreign("kernel32")
   def GetModuleHandleW(name: dtypes.Pointer[dtypes.CUShort]) -> HINSTANCE: ...
   @foreign("kernel32")
   def ExitProcess(status: dtypes.CUInt) -> dtypes.NoReturn: ...
+
+  @opaque()
+  class HDC: pass
+  @opaque()
+  class HWND: pass
+  @opaque()
+  class HMENU: pass
+  @opaque()
+  class HICON: pass
+  @opaque()
+  class HBRUSH: pass
+  @opaque()
+  class HCURSOR: pass
+  @opaque()
+  class HMONITOR: pass
+  type WNDPROC = dtypes.Procedure[[HWND, dtypes.CUInt, dtypes.USize, dtypes.SSize], dtypes.SSize]
+
+  @struct()
+  class WNDCLASSEXW:
+    cbSize: dtypes.CUInt
+    style: dtypes.CUInt
+    lpfnWndProc: WNDPROC
+    cbClsExtra: dtypes.CInt
+    cbWndExtra: dtypes.CInt
+    hInstance: HINSTANCE
+    hIcon: HICON
+    hCursor: HCURSOR
+    hbrBackground: HBRUSH
+    lpszMenuName: dtypes.Pointer[dtypes.CUShort]
+    lpszClassName: dtypes.Pointer[dtypes.CUShort]
+    hIconSm: HICON
 
   @foreign("user32")
   def SetProcessDPIAware() -> dtypes.CInt: ...
