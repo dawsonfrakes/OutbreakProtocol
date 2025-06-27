@@ -8,11 +8,16 @@ if OS == OSs.WINDOWS:
   @foreign("kernel32")
   def ExitProcess(status: dtypes.CUInt) -> dtypes.NoReturn: ...
 
+  @foreign("user32")
+  def SetProcessDPIAware() -> dtypes.CInt: ...
+
   platform_hinstance: HINSTANCE
 
   @entry()
   def WinMainCRTStartup() -> dtypes.NoReturn:
     G.platform_hinstance = GetModuleHandleW(None)
+
+    SetProcessDPIAware()
 
     ExitProcess(0)
 elif OS == OSs.DARWIN:
