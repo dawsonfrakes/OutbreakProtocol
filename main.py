@@ -1,4 +1,4 @@
-from c4.c4 import dtypes, entry, foreign, G, OSs, OS, size_of, struct
+from c4.c4 import dtypes, entry, foreign, G, OSs, OS, struct
 
 if OS == OSs.WINDOWS:
 	# kernel32
@@ -54,7 +54,7 @@ if OS == OSs.WINDOWS:
 
 		SetProcessDPIAware()
 		wndclass = WNDCLASSEXW()
-		wndclass.cbSize = size_of(WNDCLASSEXW)
+		wndclass.cbSize = dtypes.size_of(WNDCLASSEXW)
 		wndclass.style = CS_OWNDC
 		def wndproc(hwnd: HWND, message: dtypes.CUInt, wParam: dtypes.USize, lParam: dtypes.SSize) -> dtypes.SSize:
 			if message == WM_DESTROY:
