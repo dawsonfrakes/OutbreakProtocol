@@ -1,6 +1,52 @@
-enum RENDERER_D3D11 = true;
+version (OSX) {
+  enum STDOUT_FILENO = 1;
 
-static if (RENDERER_D3D11) {
+  extern(C) ptrdiff_t write(int, const(void)*, size_t);
+  extern(C) noreturn _exit(int);
+
+  struct objc_Class__; alias objc_Class = objc_Class__*;
+  struct objc_SEL__; alias objc_SEL = objc_SEL__*;
+
+  extern(C) void objc_msgSend();
+  extern(C) objc_Class objc_getClass(const(char)*);
+  extern(C) objc_SEL sel_getUid(const(char)*);
+
+  struct NSApplication {
+    enum ActivationPolicy : int {
+      REGULAR = 0,
+      ACCESSORY = 1,
+      PROHIBITED = 2,
+    }
+
+    extern(C) static NSApplication* sharedApplication() {
+      alias PFN = extern(C) NSApplication* function(objc_Class, objc_SEL);
+      return (cast(PFN) &objc_msgSend)(objc_getClass("NSApplication"), sel_getUid("sharedApplication"));
+    }
+
+    extern(C) bool setActivationPolicy(ActivationPolicy policy) {
+      alias PFN = extern(C) bool function(NSApplication*, objc_SEL, ActivationPolicy);
+      return (cast(PFN) &objc_msgSend)(&this, sel_getUid("setActivationPolicy:"), policy);
+    }
+  }
+
+  extern(C) bool NSApplicationLoad();
+
+  __gshared NSApplication* platform_app;
+
+  extern(C) noreturn main() {
+    NSApplicationLoad();
+    platform_app = NSApplication.sharedApplication();
+    platform_app.setActivationPolicy(NSApplication.ActivationPolicy.REGULAR);
+
+    _exit(0);
+  }
+
+  pragma(linkerDirective, "-framework", "AppKit");
+}
+
+version (Windows) version = D3D11;
+
+version (D3D11) {
   struct DXGI_RATIONAL {
     uint Numerator;
     uint Denominator;
