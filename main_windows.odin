@@ -1,6 +1,6 @@
 package main
 
-RENDERER :: #config(RENDERER, "OPENGL")
+RENDERER :: #config(RENDERER, "D3D11")
 renderer :: opengl_renderer when RENDERER == "OPENGL" else d3d11_renderer when RENDERER == "D3D11" else nil
 
 import "base:intrinsics"
