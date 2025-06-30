@@ -345,6 +345,7 @@ typedef double F64;
   #import "AppKit/AppKit.h"
 
   static NSApplication* platform_app;
+  static NSWindow* platform_window;
 
   extern "C" [[noreturn]] void _start() __asm__("_main");
   extern "C" [[noreturn]] void _start() {
@@ -352,6 +353,14 @@ typedef double F64;
 
     platform_app = [NSApplication sharedApplication];
     [platform_app setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+    platform_window = [[NSWindow alloc]
+      initWithContentRect:CGRect{CGPoint{0, 0}, CGSize{640, 480}}
+      styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskResizable
+      backing:NSBackingStoreBuffered defer:NO];
+    [platform_window setTitle:@"Outbreak Protocol"];
+    [platform_window makeKeyAndOrderFront:nil];
+    [platform_app run];
 
     _exit(0);
   }
