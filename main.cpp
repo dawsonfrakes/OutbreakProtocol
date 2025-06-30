@@ -56,7 +56,7 @@
   #define OP_OS_LINUX 0
 #endif
 
-#define null nullptr
+constexpr auto null = nullptr;
 #define cast(T, V) ((T) (V))
 
 #if OP_CPU_AMD64 || OP_CPU_ARM64
@@ -339,4 +339,20 @@ typedef double F64;
   }
 
   extern "C" int _fltused = 0;
+#endif
+
+#if OP_OS_MACOS
+  #import "AppKit/AppKit.h"
+
+  static NSApplication* platform_app;
+
+  extern "C" [[noreturn]] void _start() __asm__("_main");
+  extern "C" [[noreturn]] void _start() {
+    NSApplicationLoad();
+
+    platform_app = [NSApplication sharedApplication];
+    [platform_app setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+    _exit(0);
+  }
 #endif
