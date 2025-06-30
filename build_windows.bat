@@ -11,7 +11,7 @@ cl.exe -Fe.build\OutbreakProtocol.exe^
  -stack:0x10000000,0x10000000 -heap:0,0 || goto :error
 
 if "%1"=="run" ( start .build\OutbreakProtocol.exe
-) else if "%1"=="debug" ( remedybg .build\OutbreakProtocol.exe
+) else if "%1"=="debug" ( remedybg .build\OutbreakProtocol.exe || windbgx .build\OutbreakProtocol.exe
 ) else if not "%1"=="" ( echo command '%1' not found & goto :error )
 
 :end

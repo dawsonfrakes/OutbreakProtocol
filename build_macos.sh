@@ -7,4 +7,5 @@ cc -g -nostdlib -o .build/OutbreakProtocol -x objective-c++ main.cpp -DOP_DEBUG=
 
 case "$1" in
   run) ./.build/OutbreakProtocol ;;
+  debug) lldb ./.build/OutbreakProtocol
 esac
