@@ -5,6 +5,8 @@
   using ws2_32;
   using dwmapi;
   using winmm;
+  using d3d11;
+  using dxgi;
 
   utf16lez :: ($s: string) -> [s.count + 1]u16 {
     result: [s.count + 1]u16;

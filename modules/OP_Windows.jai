@@ -1,3 +1,21 @@
+HANDLE :: *void;
+HRESULT :: s32;
+GUID :: struct {
+  Data1: u32;
+  Data2: u16;
+  Data3: u16;
+  Data4: [8]u8;
+}
+
+IUnknown_VTable :: struct {
+  QueryInterface: (*IUnknown, *GUID, **void) -> HRESULT #cpp_method;
+  AddRef: (*IUnknown) -> u32 #cpp_method;
+  Release: (*IUnknown) -> u32 #cpp_method;
+}
+IUnknown :: struct {
+  using _iunknown_vtable: *IUnknown_VTable;
+}
+
 kernel32 :: struct {
   kernel32_library :: #library,system "kernel32";
 
@@ -5,8 +23,6 @@ kernel32 :: struct {
   STD_OUTPUT_HANDLE :: cast,no_check(u32) -11;
   STD_ERROR_HANDLE :: cast,no_check(u32) -12;
 
-  HANDLE :: *void;
-  HRESULT :: s32;
   HINSTANCE :: *struct {};
   HMODULE :: HINSTANCE;
 
@@ -174,7 +190,7 @@ dwmapi :: struct {
   DWMWA_WINDOW_CORNER_PREFERENCE :: 33;
   DWMWCP_DONOTROUND :: 1;
 
-  DwmSetWindowAttribute :: (hwnd: user32.HWND, attribute: u32, value: *void, size: u32) -> kernel32.HRESULT #foreign dwmapi_library;
+  DwmSetWindowAttribute :: (hwnd: user32.HWND, attribute: u32, value: *void, size: u32) -> HRESULT #foreign dwmapi_library;
 }
 
 winmm :: struct {
@@ -183,4 +199,21 @@ winmm :: struct {
   TIMERR_NOERROR :: 0;
 
   timeBeginPeriod :: (interval: u32) -> u32 #foreign winmm_library;
+}
+
+d3d11 :: struct {
+  d3d11_library :: #library,system "d3d11";
+
+  ID3D11Device_VTable :: struct {
+    using iunknown_vtable: IUnknown_VTable;
+    // ...
+  }
+  ID3D11Device :: struct {
+    #as iunknown: IUnknown;
+    #place iunknown; using id3d11device_vtable: *ID3D11Device_VTable;
+  }
+}
+
+dxgi :: struct {
+  dxgi_library :: #library,system "dxgi";
 }
