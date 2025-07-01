@@ -155,9 +155,6 @@ version (Windows) {
   pragma(lib, "ws2_32");
   pragma(lib, "dwmapi");
   pragma(lib, "winmm");
-
-  pragma(lib, "d3d11");
-  pragma(lib, "dxgi");
 }
 
 version (OSX) {
