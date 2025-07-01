@@ -12,7 +12,8 @@ null_renderer :: struct {
 }
 
 #if OS == {
-  case .WINDOWS; RENDERERS: Platform_Renderer_Tag : .D3D11 | .OPENGL;
+  case .WINDOWS; RENDERERS :: Platform_Renderer_Tag.NULL | .D3D11 | .OPENGL;
+  case;          RENDERERS :: Platform_Renderer_Tag.NULL;
 }
 
 #if RENDERERS & .D3D11 {
@@ -22,14 +23,32 @@ null_renderer :: struct {
 
   d3dobj: struct {
     initted: bool;
+    swapchain: *IDXGISwapChain;
     device: *ID3D11Device;
+    ctx: *ID3D11DeviceContext;
   }
 
   d3d11_init :: () #no_context {
     hr: HRESULT = ---;
     while label := true {
-      // hr = D3D11CreateDeviceAndSwapChain();
-      // if hr < 0 break label;
+      swapchain_descriptor: DXGI_SWAP_CHAIN_DESC;
+      swapchain_descriptor.BufferDesc.Width = platform_size[0];
+      swapchain_descriptor.BufferDesc.Height = platform_size[1];
+      swapchain_descriptor.BufferDesc.RefreshRate.Numerator = 60;
+      swapchain_descriptor.BufferDesc.RefreshRate.Denominator = 1;
+      swapchain_descriptor.BufferDesc.Format = .R8G8B8A8_UNORM;
+      swapchain_descriptor.SampleDesc.Count = 8;
+      swapchain_descriptor.BufferUsage = .RENDER_TARGET_OUTPUT;
+      swapchain_descriptor.BufferCount = 1;
+      swapchain_descriptor.OutputWindow = platform_hwnd;
+      swapchain_descriptor.Windowed = xx true;
+      swapchain_descriptor.Flags = xx DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH;
+      hr = D3D11CreateDeviceAndSwapChain(null, .HARDWARE, null,
+        xx D3D11_CREATE_DEVICE_FLAG.DEBUG,
+        null, 0, D3D11_SDK_VERSION, *swapchain_descriptor,
+        *d3dobj.swapchain, *d3dobj.device, null, *d3dobj.ctx);
+      if hr < 0 break label;
+
       d3dobj.initted = true;
       return;
     }
@@ -37,7 +56,10 @@ null_renderer :: struct {
   }
 
   d3d11_deinit :: () #no_context {
-
+    if d3dobj.ctx d3dobj.ctx.Release(d3dobj.ctx);
+    if d3dobj.device d3dobj.device.Release(d3dobj.device);
+    if d3dobj.swapchain d3dobj.swapchain.Release(d3dobj.swapchain);
+    d3dobj = .{};
   }
 
   d3d11_resize :: () #no_context {
@@ -45,7 +67,8 @@ null_renderer :: struct {
   }
 
   d3d11_present :: () #no_context {
-
+    if !d3dobj.initted return;
+    d3dobj.swapchain.Present(d3dobj.swapchain, 0, 0);
   }
 
   d3d11_renderer :: struct {
@@ -157,6 +180,8 @@ null_renderer :: struct {
           else clear_held_keys();
         case WM_SIZE;
           platform_size = .[cast,no_check(u16)lParam, cast,no_check(u16) (lParam >> 16)];
+
+          platform_renderer.resize();
         case WM_CREATE;
           platform_hwnd = hwnd;
           platform_hdc = GetDC(hwnd);
@@ -165,7 +190,11 @@ null_renderer :: struct {
           DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, *dark_mode, size_of(type_of(dark_mode)));
           round_mode: s32 = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, *round_mode, size_of(type_of(round_mode)));
+
+          platform_renderer.init();
         case WM_DESTROY;
+          platform_renderer.deinit();
+
           PostQuitMessage(0);
         case WM_SYSCOMMAND;
           if wParam == SC_KEYMENU return 0;
@@ -214,6 +243,8 @@ null_renderer :: struct {
             DispatchMessageW(*msg);
         }
       }
+
+      platform_renderer.present();
 
       if sleep_is_granular {
         Sleep(1);
