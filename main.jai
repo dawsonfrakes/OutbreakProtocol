@@ -1,3 +1,61 @@
+Platform_Renderer_Tag :: enum_flags u32 {
+  NULL :: 0;
+  D3D11 :: 1 << 0;
+  OPENGL :: 1 << 1;
+}
+
+null_renderer :: struct {
+  init :: () #no_context {}
+  deinit :: () #no_context {}
+  resize :: () #no_context {}
+  present :: () #no_context {}
+}
+
+#if OS == {
+  case .WINDOWS; RENDERERS: Platform_Renderer_Tag : .D3D11 | .OPENGL;
+}
+
+#if RENDERERS & .D3D11 {
+  #import "OP_Windows";
+  using d3d11;
+  using dxgi;
+
+  d3dobj: struct {
+    initted: bool;
+    device: *ID3D11Device;
+  }
+
+  d3d11_init :: () #no_context {
+    hr: HRESULT = ---;
+    while label := true {
+      // hr = D3D11CreateDeviceAndSwapChain();
+      // if hr < 0 break label;
+      d3dobj.initted = true;
+      return;
+    }
+    d3d11_deinit();
+  }
+
+  d3d11_deinit :: () #no_context {
+
+  }
+
+  d3d11_resize :: () #no_context {
+
+  }
+
+  d3d11_present :: () #no_context {
+
+  }
+
+  d3d11_renderer :: struct {
+    init :: d3d11_init;
+    deinit :: d3d11_deinit;
+    resize :: d3d11_resize;
+    present :: d3d11_present;
+  }
+}
+
 #if OS == .WINDOWS {
   #import "OP_Windows";
   using kernel32;
@@ -5,8 +63,6 @@
   using ws2_32;
   using dwmapi;
   using winmm;
-  using d3d11;
-  using dxgi;
 
   utf16lez :: ($s: string) -> [s.count + 1]u16 {
     result: [s.count + 1]u16;
@@ -22,6 +78,8 @@
     platform_stdout: HANDLE;
     platform_stderr: HANDLE;
   }
+  #if RENDERERS & .D3D11 platform_renderer :: d3d11_renderer;
+  else platform_renderer :: null_renderer;
 
   platform_write :: (s: string, prefix: string, handle: HANDLE) #no_context {
     #if DEBUG {
