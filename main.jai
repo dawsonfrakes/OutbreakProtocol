@@ -1,13 +1,13 @@
-utf16lez :: ($s: string) -> [s.count + 1]u16 {
-  result: [s.count + 1]u16;
-  for s result[it_index] = it;
-  return result;
-}
-
 #if OS == .WINDOWS {
   #import "OP_Windows";
   using kernel32;
   using user32;
+
+  utf16lez :: ($s: string) -> [s.count + 1]u16 {
+    result: [s.count + 1]u16;
+    for s result[it_index] = it;
+    return result;
+  }
 
   platform_hinstance: HINSTANCE;
   platform_hwnd: HWND;
@@ -73,5 +73,27 @@ utf16lez :: ($s: string) -> [s.count + 1]u16 {
     a8 := cast(*u8) a;
     for 1..size a8[it - 1] = cast,no_check(u8) b;
     return a;
+  }
+} else #if OS == .MACOS {
+  #import "OP_macOS";
+
+  platform_app: *NSApplication;
+  platform_window: *NSWindow;
+
+  #program_export "main"
+  entry :: (argc: s32, argv: **u8) #c_call {
+    NSApplicationLoad();
+    init_objc_classes_and_selectors();
+
+    platform_app = NSApplication.sharedApplication();
+    NSApplication.setActivationPolicy(platform_app, .REGULAR);
+
+    platform_window = NSWindow.init(NSWindow.alloc(), .{.{0, 0}, .{640, 480}}, .TITLED | .CLOSABLE | .RESIZABLE | .MINIATURIZABLE, .BUFFERED, false);
+    // NSWindow.setTitle(platform_window, NSString.init(NSString.alloc(), "Outbreak Protocol"));
+    NSWindow.makeKeyAndOrderFront(platform_window, null);
+
+    NSApplication.run(platform_app);
+
+    _exit(0);
   }
 }
