@@ -1,3 +1,5 @@
+import renderer;
+
 version (Windows) {
   import basic.windows;
 
@@ -69,6 +71,8 @@ version (Windows) {
           return 0;
         case WM_SIZE:
           platform_size = [cast(ushort) lParam, cast(ushort) (lParam >> 16)];
+
+          d3d11_renderer.resize();
           return 0;
         case WM_CREATE:
           platform_hwnd = hwnd;
@@ -78,8 +82,12 @@ version (Windows) {
           DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, dark_mode.sizeof);
           int round_mode = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
+
+          d3d11_renderer.init();
           return 0;
         case WM_DESTROY:
+          d3d11_renderer.deinit();
+
           PostQuitMessage(0);
           return 0;
         case WM_SYSCOMMAND:
@@ -129,6 +137,8 @@ version (Windows) {
         }
       }
 
+      d3d11_renderer.present();
+
       if (sleep_is_granular) {
         Sleep(1);
       }
@@ -145,6 +155,9 @@ version (Windows) {
   pragma(lib, "ws2_32");
   pragma(lib, "dwmapi");
   pragma(lib, "winmm");
+
+  pragma(lib, "d3d11");
+  pragma(lib, "dxgi");
 }
 
 version (OSX) {
