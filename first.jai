@@ -28,6 +28,7 @@ RELEASE :: false;
   }
   set_build_options(options, w);
   compiler_begin_intercept(w);
+  add_build_string(sprint("DEBUG :: %;", !RELEASE), w);
   add_build_file("main.jai", w);
 
   while true {
@@ -70,7 +71,7 @@ RELEASE :: false;
             }
             array_add(*cmd, ..system_libraries);
             array_add(*cmd, ..phase.user_libraries);
-            if options.text_output_flags & .OUTPUT_LINK_LINE print("%\n", join(..cmd, " "));
+            if options.text_output_flags & .OUTPUT_LINK_LINE print("%\n", join(..cmd, "^\n "));
             status := run_command(..cmd);
             phase.linker_exit_code = status.exit_code;
             compiler_custom_link_command_is_complete(w);
@@ -87,7 +88,7 @@ RELEASE :: false;
             array_add(*cmd, "-F/System/Library/Frameworks");
             array_add(*cmd, ..phase.system_libraries);
             array_add(*cmd, ..phase.user_libraries);
-            if options.text_output_flags & .OUTPUT_LINK_LINE print("%\n", join(..cmd, " "));
+            if options.text_output_flags & .OUTPUT_LINK_LINE print("%\n", join(..cmd, "\\\n "));
             status := run_command(..cmd);
             phase.linker_exit_code = status.exit_code;
             compiler_custom_link_command_is_complete(w);
