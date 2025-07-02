@@ -92,6 +92,8 @@ version (D3D11) {
 }
 
 version (OpenGL) {
+  import basic : max, min;
+
   version (Windows) {
     import main : platform_hdc;
     import basic.windows;
@@ -109,11 +111,11 @@ version (OpenGL) {
       }
     }
 
-    struct OpenGLData {
+    struct OpenGLPlatformData {
       HGLRC ctx;
     }
 
-    __gshared OpenGLData opengl;
+    __gshared OpenGLPlatformData platform_opengl;
 
     void opengl_platform_init() {
       PIXELFORMATDESCRIPTOR pfd;
@@ -142,8 +144,8 @@ version (OpenGL) {
         WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
         0,
       ];
-      opengl.ctx = wglCreateContextAttribsARB(platform_hdc, null, attribs.ptr);
-      wglMakeCurrent(platform_hdc, opengl.ctx);
+      platform_opengl.ctx = wglCreateContextAttribsARB(platform_hdc, null, attribs.ptr);
+      wglMakeCurrent(platform_hdc, platform_opengl.ctx);
 
       HMODULE opengl32 = GetModuleHandleW("opengl32");
       static foreach (name; __traits(allMembers, basic.opengl)[1..$]) {
@@ -162,8 +164,8 @@ version (OpenGL) {
     }
 
     void opengl_platform_deinit() {
-      if (opengl.ctx) wglDeleteContext(opengl.ctx);
-      opengl = opengl.init;
+      if (platform_opengl.ctx) wglDeleteContext(platform_opengl.ctx);
+      platform_opengl = platform_opengl.init;
     }
 
     void opengl_platform_resize() {
@@ -178,11 +180,23 @@ version (OpenGL) {
     pragma(lib, "opengl32");
   }
 
+  struct OpenGLData {
+    uint main_fbo;
+    uint main_fbo_color0;
+    uint main_fbo_depth;
+  }
+
+  __gshared OpenGLData opengl;
+
   void opengl_init() {
     static if (__traits(compiles, opengl_platform_init))
       opengl_platform_init();
 
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
+    glCreateFramebuffers(1, &opengl.main_fbo);
+    glCreateRenderbuffers(1, &opengl.main_fbo_color0);
+    glCreateRenderbuffers(1, &opengl.main_fbo_depth);
   }
 
   void opengl_deinit() {
@@ -193,11 +207,37 @@ version (OpenGL) {
   void opengl_resize() {
     static if (__traits(compiles, opengl_platform_resize))
       opengl_platform_resize();
+
+    if (platform_size[0] == 0 || platform_size[1] == 0) return;
+
+    int fbo_color_samples = void;
+    glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &fbo_color_samples);
+    int fbo_depth_samples = void;
+    glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &fbo_depth_samples);
+    uint fbo_samples = cast(uint) max(1, min(fbo_color_samples, fbo_depth_samples));
+
+    glNamedRenderbufferStorageMultisample(opengl.main_fbo_color0, fbo_samples, GL_RGBA16F, platform_size[0], platform_size[1]);
+    glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, opengl.main_fbo_color0);
+
+    glNamedRenderbufferStorageMultisample(opengl.main_fbo_depth, fbo_samples, GL_DEPTH_COMPONENT32F, platform_size[0], platform_size[1]);
+    glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, opengl.main_fbo_depth);
   }
 
   void opengl_present() {
     static if (__traits(compiles, opengl_platform_present))
       opengl_platform_present();
+
+    __gshared immutable clear_color0 = [0.6f, 0.2f, 0.2f, 1.0f];
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, clear_color0.ptr);
+    __gshared immutable clear_depth = [0.0f];
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, clear_depth.ptr);
+
+    glEnable(GL_FRAMEBUFFER_SRGB);
+    glBlitNamedFramebuffer(opengl.main_fbo, 0,
+      0, 0, platform_size[0], platform_size[1],
+      0, 0, platform_size[0], platform_size[1],
+      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glDisable(GL_FRAMEBUFFER_SRGB);
   }
 
   __gshared immutable opengl_renderer = Platform_Renderer(

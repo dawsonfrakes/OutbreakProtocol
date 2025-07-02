@@ -14,3 +14,6 @@ template COMClass() {
   VTable* _vtable;
   auto opDispatch(string s, T...)(T args) => mixin("_vtable.", s)(&this, args);
 }
+
+auto min(A, B)(A a, B b) => a < b ? a : b;
+auto max(A, B)(A a, B b) => a > b ? a : b;
