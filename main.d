@@ -12,6 +12,18 @@ version (Windows) {
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
 
+  void platform_log_any(bool error)(const(char)[] s) {
+    debug {
+      __gshared immutable prefix = error ? "ERROR: " : "LOG: ";
+      HANDLE file = error ? platform_stderr : platform_stdout;
+      WriteFile(file, prefix.ptr, cast(uint) prefix.length, null, null);
+      WriteFile(file, s.ptr, cast(uint) s.length, null, null);
+      WriteFile(file, "\n".ptr, 1, null, null);
+    }
+  }
+  void platform_log(const(char)[] s) { platform_log_any!false(s); }
+  void platform_error(const(char)[] s) { platform_log_any!true(s); }
+
   void platform_toggle_fullscreen() {
     __gshared WINDOWPLACEMENT save_placement = {WINDOWPLACEMENT.sizeof};
     const style = GetWindowLongPtrW(platform_hwnd, GWL_STYLE);

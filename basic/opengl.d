@@ -37,6 +37,14 @@ enum GL_LINEAR = 0x2601;
 @gl_version(1, 0) extern(System) void glClear(uint);
 @gl_version(1, 0) extern(System) void glGetIntegerv(uint, int*);
 
+// 1.1
+@gl_version(1, 1) extern(System) void glDrawArrays(uint, int, uint);
+@gl_version(1, 1) extern(System) void glDrawElements(uint, uint, uint, const(void)*);
+
+// 1.5
+enum GL_STATIC_DRAW = 0x88E4;
+enum GL_DYNAMIC_DRAW = 0x88E8;
+
 // 2.0
 enum GL_LOWER_LEFT = 0x8CA1;
 
@@ -49,9 +57,18 @@ enum GL_FRAMEBUFFER = 0x8D40;
 enum GL_RENDERBUFFER = 0x8D41;
 enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 
+@gl_version(3, 0) extern(System) void glBindVertexArray(uint);
+
 // 3.2
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
+
+// 4.3
+enum GL_DEBUG_OUTPUT = 0x92E0;
+
+alias GLDEBUGPROC = extern(System) void function(uint, uint, uint, uint, uint, const(char)*, const(void)*);
+
+@gl_version(4, 3) extern(System) void glDebugMessageCallback(GLDEBUGPROC, const(void)*);
 
 // 4.5
 enum GL_ZERO_TO_ONE = 0x935F;
@@ -63,3 +80,11 @@ enum GL_ZERO_TO_ONE = 0x935F;
 @gl_version(4, 5) extern(System) void glBlitNamedFramebuffer(uint, uint, int, int, int, int, int, int, int, int, uint, uint);
 @gl_version(4, 5) extern(System) void glCreateRenderbuffers(uint, uint*);
 @gl_version(4, 5) extern(System) void glNamedRenderbufferStorageMultisample(uint, uint, uint, uint, uint);
+@gl_version(4, 5) extern(System) void glCreateVertexArrays(uint, uint*);
+@gl_version(4, 5) extern(System) void glVertexArrayElementBuffer(uint, uint);
+@gl_version(4, 5) extern(System) void glVertexArrayVertexBuffer(uint, uint, uint, ptrdiff_t, uint);
+@gl_version(4, 5) extern(System) void glEnableVertexArrayAttrib(uint, uint);
+@gl_version(4, 5) extern(System) void glVertexArrayAttribFormat(uint, uint, int, uint, bool, uint);
+@gl_version(4, 5) extern(System) void glVertexArrayAttribBinding(uint, uint, uint);
+@gl_version(4, 5) extern(System) void glCreateBuffers(uint, uint*);
+@gl_version(4, 5) extern(System) void glNamedBufferData(uint, size_t, const(void)*, uint);

@@ -92,6 +92,7 @@ version (D3D11) {
 }
 
 version (OpenGL) {
+  import main : platform_log;
   import basic : max, min;
 
   version (Windows) {
@@ -103,7 +104,7 @@ version (OpenGL) {
       static if (is(typeof(__traits(getMember, basic.opengl, name)) == function)) {
         static foreach (attribute; __traits(getAttributes, __traits(getMember, basic.opengl, name))) {
           static if (is(typeof(attribute) == basic.opengl.gl_version)) {
-            mixin("__gshared "~(typeof(__traits(getMember, basic.opengl, name))*).stringof~" "~name~";");
+            mixin("__gshared typeof(basic.opengl."~name~")* "~name~";");
           }
         }
       } else {
@@ -184,19 +185,59 @@ version (OpenGL) {
     uint main_fbo;
     uint main_fbo_color0;
     uint main_fbo_depth;
+
+    uint triangle_vao;
+    uint triangle_vbo;
+    uint triangle_ebo;
   }
 
   __gshared OpenGLData opengl;
 
+  align(16) struct OpenGLTriangleVertex {
+    float[3] position;
+  }
+
+  extern(System) void opengl_debug_proc(uint source, uint type, uint id, uint severity, uint length, const(char)* message, const(void)* param) {
+    platform_log(message[0..length]);
+  }
+
   void opengl_init() {
     static if (__traits(compiles, opengl_platform_init))
       opengl_platform_init();
+
+    debug {
+      glEnable(GL_DEBUG_OUTPUT);
+      glDebugMessageCallback(&opengl_debug_proc, null);
+    }
 
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 
     glCreateFramebuffers(1, &opengl.main_fbo);
     glCreateRenderbuffers(1, &opengl.main_fbo_color0);
     glCreateRenderbuffers(1, &opengl.main_fbo_depth);
+
+    __gshared immutable OpenGLTriangleVertex[3] vertices = [
+      OpenGLTriangleVertex([-0.5, -0.5, 0.0]),
+      OpenGLTriangleVertex([+0.5, -0.5, 0.0]),
+      OpenGLTriangleVertex([+0.0, +0.5, 0.0]),
+    ];
+    __gshared immutable ubyte[6] elements = [0, 1, 2, 2, 3, 0];
+
+    glCreateBuffers(1, &opengl.triangle_vbo);
+    glNamedBufferData(opengl.triangle_vbo, vertices.length * OpenGLTriangleVertex.sizeof, vertices.ptr, GL_STATIC_DRAW);
+
+    glCreateBuffers(1, &opengl.triangle_ebo);
+    glNamedBufferData(opengl.triangle_ebo, elements.length * ubyte.sizeof, elements.ptr, GL_STATIC_DRAW);
+
+    uint vbo_binding = 0;
+    glCreateVertexArrays(1, &opengl.triangle_vao);
+    glVertexArrayElementBuffer(opengl.triangle_vao, opengl.triangle_ebo);
+    glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, opengl.triangle_vbo, 0, OpenGLTriangleVertex.sizeof);
+
+    uint position_attrib = 0;
+    glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.triangle_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, OpenGLTriangleVertex.position.offsetof);
   }
 
   void opengl_deinit() {
@@ -231,6 +272,11 @@ version (OpenGL) {
     glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, clear_color0.ptr);
     __gshared immutable clear_depth = [0.0f];
     glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, clear_depth.ptr);
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(opengl.triangle_vao);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, cast(const(void)*) 0);
 
     glEnable(GL_FRAMEBUFFER_SRGB);
     glBlitNamedFramebuffer(opengl.main_fbo, 0,
