@@ -285,11 +285,106 @@ enum D3D11_CREATE_DEVICE_FLAG : int {
   DISABLE_GPU_TIMEOUT = 0x100,
   VIDEO_SUPPORT = 0x800,
 }
+enum D3D11_RTV_DIMENSION : int {
+  D3D11_RTV_DIMENSION_UNKNOWN = 0,
+  D3D11_RTV_DIMENSION_BUFFER = 1,
+  D3D11_RTV_DIMENSION_TEXTURE1D = 2,
+  D3D11_RTV_DIMENSION_TEXTURE1DARRAY = 3,
+  D3D11_RTV_DIMENSION_TEXTURE2D = 4,
+  D3D11_RTV_DIMENSION_TEXTURE2DARRAY = 5,
+  D3D11_RTV_DIMENSION_TEXTURE2DMS = 6,
+  D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY = 7,
+  D3D11_RTV_DIMENSION_TEXTURE3D = 8,
+}
+struct D3D11_BUFFER_RTV {
+  union {
+    uint FirstElement;
+    uint ElementOffset;
+  }
+  union {
+    uint NumElements;
+    uint ElementWidth;
+  }
+}
+struct D3D11_TEX1D_RTV {
+  uint MipSlice;
+}
+struct D3D11_TEX1D_ARRAY_RTV {
+  uint MipSlice;
+  uint FirstArraySlice;
+  uint ArraySize;
+}
+struct D3D11_TEX2D_RTV {
+  uint MipSlice;
+}
+struct D3D11_TEX2D_ARRAY_RTV {
+  uint MipSlice;
+  uint FirstArraySlice;
+  uint ArraySize;
+}
+struct D3D11_TEX2DMS_RTV {
+  uint UnusedField_NothingToDefine;
+}
+struct D3D11_TEX2DMS_ARRAY_RTV {
+  uint FirstArraySlice;
+  uint ArraySize;
+}
+struct D3D11_TEX3D_RTV {
+  uint MipSlice;
+  uint FirstWSlice;
+  uint WSize;
+}
+struct D3D11_RENDER_TARGET_VIEW_DESC {
+  DXGI_FORMAT Format;
+  D3D11_RTV_DIMENSION ViewDimension;
+  union {
+    D3D11_BUFFER_RTV Buffer;
+    D3D11_TEX1D_RTV Texture1D;
+    D3D11_TEX1D_ARRAY_RTV Texture1DArray;
+    D3D11_TEX2D_RTV Texture2D;
+    D3D11_TEX2D_ARRAY_RTV Texture2DArray;
+    D3D11_TEX2DMS_RTV Texture2DMS;
+    D3D11_TEX2DMS_ARRAY_RTV Texture2DMSArray;
+    D3D11_TEX3D_RTV Texture3D;
+  }
+}
+enum D3D11_RESOURCE_DIMENSION : int {
+  D3D11_RESOURCE_DIMENSION_UNKNOWN = 0,
+  D3D11_RESOURCE_DIMENSION_BUFFER = 1,
+  D3D11_RESOURCE_DIMENSION_TEXTURE1D = 2,
+  D3D11_RESOURCE_DIMENSION_TEXTURE2D = 3,
+  D3D11_RESOURCE_DIMENSION_TEXTURE3D = 4,
+}
+enum D3D11_USAGE : int {
+  D3D11_USAGE_DEFAULT = 0,
+  D3D11_USAGE_IMMUTABLE = 1,
+  D3D11_USAGE_DYNAMIC = 2,
+  D3D11_USAGE_STAGING = 3,
+}
+struct D3D11_TEXTURE2D_DESC {
+  uint Width;
+  uint Height;
+  uint MipLevels;
+  uint ArraySize;
+  DXGI_FORMAT Format;
+  DXGI_SAMPLE_DESC SampleDesc;
+  D3D11_USAGE Usage;
+  uint BindFlags;
+  uint CPUAccessFlags;
+  uint MiscFlags;
+}
 struct ID3D11Device {
   __gshared immutable uuidof = IID(0xDB6F6DDB, 0xAC77, 0x4E88, [0x82, 0x53, 0x81, 0x9D, 0xF9, 0xBB, 0xF1, 0x40]);
   struct VTable {
     IUnknown.VTable iunknown_vtable;
     alias this = iunknown_vtable;
+    void* CreateBuffer;
+    void* CreateTexture1D;
+    void* CreateTexture2D;
+    void* CreateTexture3D;
+    void* CreateShaderResourceView;
+    void* CreateUnorderedAccessView;
+    extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_RENDER_TARGET_VIEW_DESC)*, ID3D11RenderTargetView**) CreateRenderTargetView;
     // ...
   }
   mixin COMClass;
@@ -311,7 +406,149 @@ struct ID3D11DeviceContext {
   struct VTable {
     ID3D11DeviceChild.VTable id3d11devicechild_vtable;
     alias this = id3d11devicechild_vtable;
-    // ...
+    void* VSSetConstantBuffers;
+    void* PSSetShaderResources;
+    void* PSSetShader;
+    void* PSSetSamplers;
+    void* VSSetShader;
+    void* DrawIndexed;
+    void* Draw;
+    void* Map;
+    void* Unmap;
+    void* PSSetConstantBuffers;
+    void* IASetInputLayout;
+    void* IASetVertexBuffers;
+    void* IASetIndexBuffer;
+    void* DrawIndexedInstanced;
+    void* DrawInstanced;
+    void* GSSetConstantBuffers;
+    void* GSSetShader;
+    void* IASetPrimitiveTopology;
+    void* VSSetShaderResources;
+    void* VSSetSamplers;
+    void* Begin;
+    void* End;
+    void* GetData;
+    void* SetPredication;
+    void* GSSetShaderResources;
+    void* GSSetSamplers;
+    void* OMSetRenderTargets;
+    void* OMSetRenderTargetsAndUnorderedAccessViews;
+    void* OMSetBlendState;
+    void* OMSetDepthStencilState;
+    void* SOSetTargets;
+    void* DrawAuto;
+    void* DrawIndexedInstancedIndirect;
+    void* DrawInstancedIndirect;
+    void* Dispatch;
+    void* DispatchIndirect;
+    void* RSSetState;
+    void* RSSetViewports;
+    void* RSSetScissorRects;
+    void* CopySubresourceRegion;
+    void* CopyResource;
+    void* UpdateSubresource;
+    void* CopyStructureCount;
+    extern(Windows) void function(void*, ID3D11RenderTargetView*, const(float)*) ClearRenderTargetView;
+    void* ClearUnorderedAccessViewUint;
+    void* ClearUnorderedAccessViewFloat;
+    void* ClearDepthStencilView;
+    void* GenerateMips;
+    void* SetResourceMinLOD;
+    void* GetResourceMinLOD;
+    void* ResolveSubresource;
+    void* ExecuteCommandList;
+    void* HSSetShaderResources;
+    void* HSSetShader;
+    void* HSSetSamplers;
+    void* HSSetConstantBuffers;
+    void* DSSetShaderResources;
+    void* DSSetShader;
+    void* DSSetSamplers;
+    void* DSSetConstantBuffers;
+    void* CSSetShaderResources;
+    void* CSSetUnorderedAccessViews;
+    void* CSSetShader;
+    void* CSSetSamplers;
+    void* CSSetConstantBuffers;
+    void* VSGetConstantBuffers;
+    void* PSGetShaderResources;
+    void* PSGetShader;
+    void* PSGetSamplers;
+    void* VSGetShader;
+    void* PSGetConstantBuffers;
+    void* IAGetInputLayout;
+    void* IAGetVertexBuffers;
+    void* IAGetIndexBuffer;
+    void* GSGetConstantBuffers;
+    void* GSGetShader;
+    void* IAGetPrimitiveTopology;
+    void* VSGetShaderResources;
+    void* VSGetSamplers;
+    void* GetPredication;
+    void* GSGetShaderResources;
+    void* GSGetSamplers;
+    void* OMGetRenderTargets;
+    void* OMGetRenderTargetsAndUnorderedAccessViews;
+    void* OMGetBlendState;
+    void* OMGetDepthStencilState;
+    void* SOGetTargets;
+    void* RSGetState;
+    void* RSGetViewports;
+    void* RSGetScissorRects;
+    void* HSGetShaderResources;
+    void* HSGetShader;
+    void* HSGetSamplers;
+    void* HSGetConstantBuffers;
+    void* DSGetShaderResources;
+    void* DSGetShader;
+    void* DSGetSamplers;
+    void* DSGetConstantBuffers;
+    void* CSGetShaderResources;
+    void* CSGetUnorderedAccessViews;
+    void* CSGetShader;
+    void* CSGetSamplers;
+    void* CSGetConstantBuffers;
+    void* ClearState;
+    void* Flush;
+    void* GetType;
+    void* GetContextFlags;
+    void* FinishCommandList;
+  }
+  mixin COMClass;
+}
+struct ID3D11Resource {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+    extern(Windows) void function(void*, D3D11_RESOURCE_DIMENSION*) GetType;
+    extern(Windows) void function(void*, uint) SetEvictionPriority;
+    extern(Windows) uint function(void*) GetEvictionPriority;
+  }
+  mixin COMClass;
+}
+struct ID3D11Texture2D {
+  __gshared immutable uuidof = IID(0x6F15AAF2, 0xD208, 0x4E89, [0x9A, 0xB4, 0x48, 0x95, 0x35, 0xD3, 0x4F, 0x9C]);
+  struct VTable {
+    ID3D11Resource.VTable id3d11resource_vtable;
+    alias this = id3d11resource_vtable;
+    extern(Windows) void function(void*, D3D11_TEXTURE2D_DESC*) GetDesc;
+  }
+  mixin COMClass;
+}
+struct ID3D11View {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+    extern(Windows) void function(void*, ID3D11Resource**) GetResource;
+  }
+  mixin COMClass;
+}
+struct ID3D11RenderTargetView {
+  struct VTable {
+    ID3D11View.VTable id3d11view_vtable;
+    alias this = id3d11view_vtable;
+    extern(Windows) void function(void*, D3D11_RENDER_TARGET_VIEW_DESC*) GetDesc;
   }
   mixin COMClass;
 }
@@ -596,7 +833,15 @@ struct IDXGISwapChain {
     IDXGIDeviceSubObject.VTable idxgidevicesubobject_vtable;
     alias this = idxgidevicesubobject_vtable;
     extern(Windows) HRESULT function(void*, uint, uint) Present;
-    // ...
+    extern(Windows) HRESULT function(void*, uint, IID*, void**) GetBuffer;
+    void* SetFullscreenState;
+    void* GetFullscreenState;
+    void* GetDesc;
+    extern(Windows) HRESULT function(void*, uint, uint, uint, DXGI_FORMAT, uint) ResizeBuffers;
+    void* ResizeTarget;
+    void* GetContainingOutput;
+    void* GetFrameStatistics;
+    void* GetLastPresentCount;
   }
   mixin COMClass;
 }

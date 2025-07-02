@@ -19,6 +19,7 @@ version (D3D11) {
     IDXGISwapChain* swapchain;
     ID3D11Device* device;
     ID3D11DeviceContext* ctx;
+    ID3D11RenderTargetView* backbuffer_view;
   }
 
   __gshared D3D11Data d3d11;
@@ -31,7 +32,7 @@ version (D3D11) {
       swapchain_descriptor.BufferDesc.Height = platform_size[1];
       swapchain_descriptor.BufferDesc.RefreshRate.Numerator = 144;
       swapchain_descriptor.BufferDesc.RefreshRate.Denominator = 1;
-      swapchain_descriptor.BufferDesc.Format = DXGI_FORMAT.R8G8B8A8_UNORM;
+      swapchain_descriptor.BufferDesc.Format = DXGI_FORMAT.R8G8B8A8_UNORM_SRGB;
       swapchain_descriptor.SampleDesc.Count = 8;
       swapchain_descriptor.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
       swapchain_descriptor.BufferCount = 1;
@@ -65,6 +66,7 @@ version (D3D11) {
   }
 
   void d3d11_deinit() {
+    if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
     if (d3d11.ctx) d3d11.ctx.Release();
     if (d3d11.device) d3d11.device.Release();
     if (d3d11.swapchain) d3d11.swapchain.Release();
@@ -72,11 +74,32 @@ version (D3D11) {
   }
 
   void d3d11_resize() {
+    if (platform_size[0] == 0 || platform_size[1] == 0) return;
+    HRESULT hr = void;
+    {
+      if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
 
+      hr = d3d11.swapchain.ResizeBuffers(1, platform_size[0], platform_size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
+      if (hr < 0) goto error;
+
+      ID3D11Texture2D* backbuffer = void;
+      hr = d3d11.swapchain.GetBuffer(0, &backbuffer.uuidof, cast(void**) &backbuffer);
+      if (hr < 0) goto error;
+      scope(exit) backbuffer.Release();
+
+      hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) backbuffer, null, &d3d11.backbuffer_view);
+      if (hr < 0) goto error;
+
+      return;
+    }
+  error:
+    d3d11_deinit();
   }
 
   void d3d11_present() {
     if (!d3d11.initted) return;
+    __gshared immutable float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
+    d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
     d3d11.swapchain.Present(0, 0);
   }
 
