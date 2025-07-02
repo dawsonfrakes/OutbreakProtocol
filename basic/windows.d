@@ -286,15 +286,15 @@ enum D3D11_CREATE_DEVICE_FLAG : int {
   VIDEO_SUPPORT = 0x800,
 }
 enum D3D11_RTV_DIMENSION : int {
-  D3D11_RTV_DIMENSION_UNKNOWN = 0,
-  D3D11_RTV_DIMENSION_BUFFER = 1,
-  D3D11_RTV_DIMENSION_TEXTURE1D = 2,
-  D3D11_RTV_DIMENSION_TEXTURE1DARRAY = 3,
-  D3D11_RTV_DIMENSION_TEXTURE2D = 4,
-  D3D11_RTV_DIMENSION_TEXTURE2DARRAY = 5,
-  D3D11_RTV_DIMENSION_TEXTURE2DMS = 6,
-  D3D11_RTV_DIMENSION_TEXTURE2DMSARRAY = 7,
-  D3D11_RTV_DIMENSION_TEXTURE3D = 8,
+  UNKNOWN = 0,
+  BUFFER = 1,
+  TEXTURE1D = 2,
+  TEXTURE1DARRAY = 3,
+  TEXTURE2D = 4,
+  TEXTURE2DARRAY = 5,
+  TEXTURE2DMS = 6,
+  TEXTURE2DMSARRAY = 7,
+  TEXTURE3D = 8,
 }
 struct D3D11_BUFFER_RTV {
   union {
@@ -349,17 +349,17 @@ struct D3D11_RENDER_TARGET_VIEW_DESC {
   }
 }
 enum D3D11_RESOURCE_DIMENSION : int {
-  D3D11_RESOURCE_DIMENSION_UNKNOWN = 0,
-  D3D11_RESOURCE_DIMENSION_BUFFER = 1,
-  D3D11_RESOURCE_DIMENSION_TEXTURE1D = 2,
-  D3D11_RESOURCE_DIMENSION_TEXTURE2D = 3,
-  D3D11_RESOURCE_DIMENSION_TEXTURE3D = 4,
+  UNKNOWN = 0,
+  BUFFER = 1,
+  TEXTURE1D = 2,
+  TEXTURE2D = 3,
+  TEXTURE3D = 4,
 }
 enum D3D11_USAGE : int {
-  D3D11_USAGE_DEFAULT = 0,
-  D3D11_USAGE_IMMUTABLE = 1,
-  D3D11_USAGE_DYNAMIC = 2,
-  D3D11_USAGE_STAGING = 3,
+  DEFAULT = 0,
+  IMMUTABLE = 1,
+  DYNAMIC = 2,
+  STAGING = 3,
 }
 struct D3D11_TEXTURE2D_DESC {
   uint Width;
@@ -373,19 +373,141 @@ struct D3D11_TEXTURE2D_DESC {
   uint CPUAccessFlags;
   uint MiscFlags;
 }
+enum D3D11_PRIMITIVE_TOPOLOGY : int {
+  UNDEFINED = 0,
+  POINTLIST = 1,
+  LINELIST = 2,
+  LINESTRIP = 3,
+  TRIANGLELIST = 4,
+  TRIANGLESTRIP = 5,
+  LINELIST_ADJ = 10,
+  LINESTRIP_ADJ = 11,
+  TRIANGLELIST_ADJ = 12,
+  TRIANGLESTRIP_ADJ = 13,
+  _1_CONTROL_POINT_PATCHLIST = 33,
+  _2_CONTROL_POINT_PATCHLIST = 34,
+  _3_CONTROL_POINT_PATCHLIST = 35,
+  _4_CONTROL_POINT_PATCHLIST = 36,
+  _5_CONTROL_POINT_PATCHLIST = 37,
+  _6_CONTROL_POINT_PATCHLIST = 38,
+  _7_CONTROL_POINT_PATCHLIST = 39,
+  _8_CONTROL_POINT_PATCHLIST = 40,
+  _9_CONTROL_POINT_PATCHLIST = 41,
+  _10_CONTROL_POINT_PATCHLIST = 42,
+  _11_CONTROL_POINT_PATCHLIST = 43,
+  _12_CONTROL_POINT_PATCHLIST = 44,
+  _13_CONTROL_POINT_PATCHLIST = 45,
+  _14_CONTROL_POINT_PATCHLIST = 46,
+  _15_CONTROL_POINT_PATCHLIST = 47,
+  _16_CONTROL_POINT_PATCHLIST = 48,
+  _17_CONTROL_POINT_PATCHLIST = 49,
+  _18_CONTROL_POINT_PATCHLIST = 50,
+  _19_CONTROL_POINT_PATCHLIST = 51,
+  _20_CONTROL_POINT_PATCHLIST = 52,
+  _21_CONTROL_POINT_PATCHLIST = 53,
+  _22_CONTROL_POINT_PATCHLIST = 54,
+  _23_CONTROL_POINT_PATCHLIST = 55,
+  _24_CONTROL_POINT_PATCHLIST = 56,
+  _25_CONTROL_POINT_PATCHLIST = 57,
+  _26_CONTROL_POINT_PATCHLIST = 58,
+  _27_CONTROL_POINT_PATCHLIST = 59,
+  _28_CONTROL_POINT_PATCHLIST = 60,
+  _29_CONTROL_POINT_PATCHLIST = 61,
+  _30_CONTROL_POINT_PATCHLIST = 62,
+  _31_CONTROL_POINT_PATCHLIST = 63,
+  _32_CONTROL_POINT_PATCHLIST = 64,
+}
+enum D3D11_BIND_FLAG : int {
+  VERTEX_BUFFER = 0x1,
+  INDEX_BUFFER = 0x2,
+  CONSTANT_BUFFER = 0x4,
+  SHADER_RESOURCE = 0x8,
+  STREAM_OUTPUT = 0x10,
+  RENDER_TARGET = 0x20,
+  DEPTH_STENCIL = 0x40,
+  UNORDERED_ACCESS = 0x80,
+  DECODER = 0x200,
+  VIDEO_ENCODER = 0x400,
+}
+struct D3D11_BUFFER_DESC {
+  uint ByteWidth;
+  D3D11_USAGE Usage;
+  uint BindFlags;
+  uint CPUAccessFlags;
+  uint MiscFlags;
+  uint StructureByteStride;
+}
+struct D3D11_SUBRESOURCE_DATA {
+  const(void)* pSysMem;
+  uint SysMemPitch;
+  uint SysMemSlicePitch;
+}
+struct D3D11_VIEWPORT {
+  float TopLeftX;
+  float TopLeftY;
+  float Width;
+  float Height;
+  float MinDepth;
+  float MaxDepth;
+}
+enum D3D11_INPUT_CLASSIFICATION : int {
+  VERTEX_DATA = 0,
+  INSTANCE_DATA = 1,
+}
+struct D3D11_INPUT_ELEMENT_DESC {
+  const(char)* SemanticName;
+  uint SemanticIndex;
+  DXGI_FORMAT Format;
+  uint InputSlot;
+  uint AlignedByteOffset;
+  D3D11_INPUT_CLASSIFICATION InputSlotClass;
+  uint InstanceDataStepRate;
+}
 struct ID3D11Device {
   __gshared immutable uuidof = IID(0xDB6F6DDB, 0xAC77, 0x4E88, [0x82, 0x53, 0x81, 0x9D, 0xF9, 0xBB, 0xF1, 0x40]);
   struct VTable {
     IUnknown.VTable iunknown_vtable;
     alias this = iunknown_vtable;
-    void* CreateBuffer;
+    extern(Windows) HRESULT function(void*, const(D3D11_BUFFER_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Buffer**) CreateBuffer;
     void* CreateTexture1D;
     void* CreateTexture2D;
     void* CreateTexture3D;
     void* CreateShaderResourceView;
     void* CreateUnorderedAccessView;
     extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_RENDER_TARGET_VIEW_DESC)*, ID3D11RenderTargetView**) CreateRenderTargetView;
-    // ...
+    void* CreateDepthStencilView;
+    extern(Windows) HRESULT function(void*, const(D3D11_INPUT_ELEMENT_DESC)*, uint, const(void)*, size_t, ID3D11InputLayout**) CreateInputLayout;
+    extern(Windows) HRESULT function(void*, const(void)*, size_t, ID3D11ClassLinkage*, ID3D11VertexShader**) CreateVertexShader;
+    void* CreateGeometryShader;
+    void* CreateGeometryShaderWithStreamOutput;
+    extern(Windows) HRESULT function(void*, const(void)*, size_t, ID3D11ClassLinkage*, ID3D11PixelShader**) CreatePixelShader;
+    void* CreateHullShader;
+    void* CreateDomainShader;
+    void* CreateComputeShader;
+    void* CreateClassLinkage;
+    void* CreateBlendState;
+    void* CreateDepthStencilState;
+    void* CreateRasterizerState;
+    void* CreateSamplerState;
+    void* CreateQuery;
+    void* CreatePredicate;
+    void* CreateCounter;
+    void* CreateDeferredContext;
+    void* OpenSharedResource;
+    void* CheckFormatSupport;
+    void* CheckMultisampleQualityLevels;
+    void* CheckCounterInfo;
+    void* CheckCounter;
+    void* CheckFeatureSupport;
+    void* GetPrivateData;
+    void* SetPrivateData;
+    void* SetPrivateDataInterface;
+    void* GetFeatureLevel;
+    void* GetCreationFlags;
+    void* GetDeviceRemovedReason;
+    void* GetImmediateContext;
+    void* SetExceptionMode;
+    void* GetExceptionMode;
   }
   mixin COMClass;
 }
@@ -401,6 +523,43 @@ struct ID3D11DeviceChild {
   }
   mixin COMClass;
 }
+struct ID3D11ClassLinkage {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+    // ...
+  }
+  mixin COMClass;
+}
+struct ID3D11VertexShader {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+  }
+  mixin COMClass;
+}
+struct ID3D11PixelShader {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+  }
+  mixin COMClass;
+}
+struct ID3D11InputLayout {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+  }
+  mixin COMClass;
+}
+struct ID3D11ClassInstance {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+    // ...
+  }
+  mixin COMClass;
+}
 struct ID3D11DeviceContext {
   __gshared immutable uuidof = IID(0xC0BFA96C, 0xE089, 0x44FB, [0x8E, 0xAF, 0x26, 0xF8, 0x79, 0x61, 0x90, 0xDA]);
   struct VTable {
@@ -408,22 +567,22 @@ struct ID3D11DeviceContext {
     alias this = id3d11devicechild_vtable;
     void* VSSetConstantBuffers;
     void* PSSetShaderResources;
-    void* PSSetShader;
+    extern(Windows) void function(void*, ID3D11PixelShader*, const(ID3D11ClassInstance*)*, uint) PSSetShader;
     void* PSSetSamplers;
-    void* VSSetShader;
-    void* DrawIndexed;
-    void* Draw;
+    extern(Windows) void function(void*, ID3D11VertexShader*, const(ID3D11ClassInstance*)*, uint) VSSetShader;
+    extern(Windows) void function(void*, uint, uint, int) DrawIndexed;
+    extern(Windows) void function(void*, uint, uint) Draw;
     void* Map;
     void* Unmap;
     void* PSSetConstantBuffers;
-    void* IASetInputLayout;
-    void* IASetVertexBuffers;
-    void* IASetIndexBuffer;
+    extern(Windows) void function(void*, ID3D11InputLayout*) IASetInputLayout;
+    extern(Windows) void function(void*, uint, uint, const(ID3D11Buffer*)*, const(uint)*, const(uint)*) IASetVertexBuffers;
+    extern(Windows) void function(void*, ID3D11Buffer*, DXGI_FORMAT, uint) IASetIndexBuffer;
     void* DrawIndexedInstanced;
     void* DrawInstanced;
     void* GSSetConstantBuffers;
     void* GSSetShader;
-    void* IASetPrimitiveTopology;
+    extern(Windows) void function(void*, D3D11_PRIMITIVE_TOPOLOGY) IASetPrimitiveTopology;
     void* VSSetShaderResources;
     void* VSSetSamplers;
     void* Begin;
@@ -432,7 +591,7 @@ struct ID3D11DeviceContext {
     void* SetPredication;
     void* GSSetShaderResources;
     void* GSSetSamplers;
-    void* OMSetRenderTargets;
+    extern(Windows) void function(void*, uint, const(ID3D11RenderTargetView*)*, ID3D11DepthStencilView*) OMSetRenderTargets;
     void* OMSetRenderTargetsAndUnorderedAccessViews;
     void* OMSetBlendState;
     void* OMSetDepthStencilState;
@@ -443,7 +602,7 @@ struct ID3D11DeviceContext {
     void* Dispatch;
     void* DispatchIndirect;
     void* RSSetState;
-    void* RSSetViewports;
+     extern(Windows) void function(void*, uint, const(D3D11_VIEWPORT)*) RSSetViewports;
     void* RSSetScissorRects;
     void* CopySubresourceRegion;
     void* CopyResource;
@@ -527,6 +686,14 @@ struct ID3D11Resource {
   }
   mixin COMClass;
 }
+struct ID3D11Buffer {
+  struct VTable {
+    ID3D11Resource.VTable id3d11resource_vtable;
+    alias this = id3d11resource_vtable;
+    // ...
+  }
+  mixin COMClass;
+}
 struct ID3D11Texture2D {
   __gshared immutable uuidof = IID(0x6F15AAF2, 0xD208, 0x4E89, [0x9A, 0xB4, 0x48, 0x95, 0x35, 0xD3, 0x4F, 0x9C]);
   struct VTable {
@@ -549,6 +716,14 @@ struct ID3D11RenderTargetView {
     ID3D11View.VTable id3d11view_vtable;
     alias this = id3d11view_vtable;
     extern(Windows) void function(void*, D3D11_RENDER_TARGET_VIEW_DESC*) GetDesc;
+  }
+  mixin COMClass;
+}
+struct ID3D11DepthStencilView {
+  struct VTable {
+    ID3D11View.VTable id3d11view_vtable;
+    alias this = id3d11view_vtable;
+    // ...
   }
   mixin COMClass;
 }
@@ -709,15 +884,15 @@ enum DXGI_FORMAT : int {
   FORCE_UINT = 0xFFFFFFFF,
 }
 enum DXGI_MODE_SCANLINE_ORDER : int {
-  DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED = 0,
-  DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE = 1,
-  DXGI_MODE_SCANLINE_ORDER_UPPER_FIELD_FIRST = 2,
-  DXGI_MODE_SCANLINE_ORDER_LOWER_FIELD_FIRST = 3,
+  UNSPECIFIED = 0,
+  PROGRESSIVE = 1,
+  UPPER_FIELD_FIRST = 2,
+  LOWER_FIELD_FIRST = 3,
 }
 enum DXGI_MODE_SCALING : int {
-  DXGI_MODE_SCALING_UNSPECIFIED = 0,
-  DXGI_MODE_SCALING_CENTERED = 1,
-  DXGI_MODE_SCALING_STRETCHED = 2,
+  UNSPECIFIED = 0,
+  CENTERED = 1,
+  STRETCHED = 2,
 }
 struct DXGI_MODE_DESC {
   uint Width;
@@ -733,10 +908,10 @@ struct DXGI_SAMPLE_DESC {
 }
 alias DXGI_USAGE = uint;
 enum DXGI_SWAP_EFFECT : int {
-  DXGI_SWAP_EFFECT_DISCARD = 0,
-  DXGI_SWAP_EFFECT_SEQUENTIAL = 1,
-  DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL = 3,
-  DXGI_SWAP_EFFECT_FLIP_DISCARD = 4,
+  DISCARD = 0,
+  SEQUENTIAL = 1,
+  FLIP_SEQUENTIAL = 3,
+  FLIP_DISCARD = 4,
 }
 enum DXGI_SWAP_CHAIN_FLAG : int {
   NONPREROTATED = 1,
@@ -845,3 +1020,54 @@ struct IDXGISwapChain {
   }
   mixin COMClass;
 }
+
+// d3dcompiler
+struct D3D_SHADER_MACRO {
+  const(char)* Name;
+  const(char)* Definition;
+}
+enum D3DCOMPILE : int {
+  DEBUG = 1 << 0,
+  SKIP_VALIDATION = 1 << 1,
+  SKIP_OPTIMIZATION = 1 << 2,
+  PACK_MATRIX_ROW_MAJOR = 1 << 3,
+  PACK_MATRIX_COLUMN_MAJOR = 1 << 4,
+  PARTIAL_PRECISION = 1 << 5,
+  FORCE_VS_SOFTWARE_NO_OPT = 1 << 6,
+  FORCE_PS_SOFTWARE_NO_OPT = 1 << 7,
+  NO_PRESHADER = 1 << 8,
+  AVOID_FLOW_CONTROL = 1 << 9,
+  PREFER_FLOW_CONTROL = 1 << 10,
+  ENABLE_STRICTNESS = 1 << 11,
+  ENABLE_BACKWARDS_COMPATIBILITY = 1 << 12,
+  IEEE_STRICTNESS = 1 << 13,
+  OPTIMIZATION_LEVEL0 = 1 << 14,
+  OPTIMIZATION_LEVEL3 = 1 << 15,
+  RESERVED16 = 1 << 16,
+  RESERVED17 = 1 << 17,
+  WARNINGS_ARE_ERRORS = 1 << 18,
+  RESOURCES_MAY_ALIAS = 1 << 19,
+  ENABLE_UNBOUNDED_DESCRIPTOR_TABLES = 1 << 20,
+  ALL_RESOURCES_BOUND = 1 << 21,
+  DEBUG_NAME_FOR_SOURCE = 1 << 22,
+  DEBUG_NAME_FOR_BINARY = 1 << 23,
+}
+struct ID3DInclude {
+  struct VTable {
+    void* Open;
+    void* Close;
+  }
+  mixin COMClass;
+}
+struct ID3DBlob {
+  struct VTable {
+    IUnknown.VTable iunknown_vtable;
+    alias this = iunknown_vtable;
+    extern(Windows) void* function(void*) GetBufferPointer;
+    extern(Windows) size_t function(void*) GetBufferSize;
+  }
+  mixin COMClass;
+}
+
+@foreign("d3dcompiler") extern(Windows) HRESULT D3DCompile(const(void)*, size_t, const(char)*, const(D3D_SHADER_MACRO)*, ID3DInclude*, const(char)*, const(char)*, uint, uint, ID3DBlob**, ID3DBlob**);
+@foreign("d3dcompiler") extern(Windows) HRESULT D3DCompileFromFile(const(wchar)*, const(D3D_SHADER_MACRO)*, ID3DInclude*, const(char)*, const(char)*, uint, uint, ID3DBlob**, ID3DBlob**);

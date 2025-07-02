@@ -10,6 +10,19 @@ struct Platform_Renderer {
   void function() present;
 }
 
+struct TriangleVertex {
+  float[3] position;
+  float[4] color;
+}
+
+__gshared immutable TriangleVertex[4] vertices = [
+  TriangleVertex([-0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
+  TriangleVertex([-0.5, +0.5, 0.0], [1.0, 0.0, 1.0, 1.0]),
+  TriangleVertex([+0.5, +0.5, 0.0], [0.0, 0.0, 1.0, 1.0]),
+  TriangleVertex([+0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
+];
+__gshared immutable ushort[6] elements = [0, 1, 2, 2, 3, 0];
+
 version (D3D11) {
   import main : platform_hwnd, platform_size;
   import basic.windows;
@@ -20,9 +33,20 @@ version (D3D11) {
     ID3D11Device* device;
     ID3D11DeviceContext* ctx;
     ID3D11RenderTargetView* backbuffer_view;
+
+    ID3D11VertexShader* triangle_vshader;
+    ID3D11PixelShader* triangle_pshader;
+    ID3D11InputLayout* triangle_input_layout;
+    ID3D11Buffer* triangle_vbo;
+    ID3D11Buffer* triangle_ebo;
   }
 
   __gshared D3D11Data d3d11;
+
+  struct D3D11TriangleVertex {
+    float[3] position;
+    float[4] color;
+  }
 
   void d3d11_init() {
     HRESULT hr = void;
@@ -30,10 +54,8 @@ version (D3D11) {
       DXGI_SWAP_CHAIN_DESC swapchain_descriptor;
       swapchain_descriptor.BufferDesc.Width = platform_size[0];
       swapchain_descriptor.BufferDesc.Height = platform_size[1];
-      swapchain_descriptor.BufferDesc.RefreshRate.Numerator = 144;
-      swapchain_descriptor.BufferDesc.RefreshRate.Denominator = 1;
       swapchain_descriptor.BufferDesc.Format = DXGI_FORMAT.R8G8B8A8_UNORM_SRGB;
-      swapchain_descriptor.SampleDesc.Count = 8;
+      swapchain_descriptor.SampleDesc.Count = 1;
       swapchain_descriptor.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
       swapchain_descriptor.BufferCount = 1;
       swapchain_descriptor.OutputWindow = platform_hwnd;
@@ -58,6 +80,84 @@ version (D3D11) {
         dxgi_device.Release();
       }
 
+      __gshared immutable shadersrc = `
+      struct VInput {
+        float3 position : Position;
+        float4 color : Color;
+      };
+      struct VOutput {
+        float4 position : SV_Position;
+        float4 color : Color;
+      };
+
+      VOutput vmain(VInput input) {
+        VOutput output;
+        output.position = float4(input.position, 1.0f);
+        output.color = input.color;
+        return output;
+      }
+
+      float4 pmain(VOutput input) : SV_Target0 {
+        return input.color;
+      }
+      `;
+      ID3DBlob* vblob;
+      hr = D3DCompile(shadersrc.ptr, shadersrc.length, null, null, null, "vmain", "vs_5_0", D3DCOMPILE.DEBUG, 0, &vblob, null);
+      if (hr < 0) goto error;
+      scope(exit) vblob.Release();
+
+      hr = d3d11.device.CreateVertexShader(vblob.GetBufferPointer(), vblob.GetBufferSize(), null, &d3d11.triangle_vshader);
+      if (hr < 0) goto error;
+
+      ID3DBlob* pblob;
+      hr = D3DCompile(shadersrc.ptr, shadersrc.length, null, null, null, "pmain", "ps_5_0", D3DCOMPILE.DEBUG, 0, &pblob, null);
+      if (hr < 0) goto error;
+      scope(exit) pblob.Release();
+
+      hr = d3d11.device.CreatePixelShader(pblob.GetBufferPointer(), pblob.GetBufferSize(), null, &d3d11.triangle_pshader);
+      if (hr < 0) goto error;
+
+      D3D11_INPUT_ELEMENT_DESC[2] triangle_input_layout_desc;
+      triangle_input_layout_desc[0].SemanticName = "Position";
+      triangle_input_layout_desc[0].SemanticIndex = 0;
+      triangle_input_layout_desc[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
+      triangle_input_layout_desc[0].InputSlot = 0;
+      triangle_input_layout_desc[0].AlignedByteOffset = D3D11TriangleVertex.position.offsetof;
+      triangle_input_layout_desc[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+      triangle_input_layout_desc[1].SemanticName = "Color";
+      triangle_input_layout_desc[1].SemanticIndex = 0;
+      triangle_input_layout_desc[1].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
+      triangle_input_layout_desc[1].InputSlot = 0;
+      triangle_input_layout_desc[1].AlignedByteOffset = D3D11TriangleVertex.color.offsetof;
+      triangle_input_layout_desc[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+      hr = d3d11.device.CreateInputLayout(triangle_input_layout_desc.ptr,
+        cast(uint) triangle_input_layout_desc.length,
+        vblob.GetBufferPointer(), vblob.GetBufferSize(),
+        &d3d11.triangle_input_layout);
+      if (hr < 0) goto error;
+
+      D3D11_BUFFER_DESC triangle_vbo_desc;
+      triangle_vbo_desc.ByteWidth = vertices.length * D3D11TriangleVertex.sizeof;
+      triangle_vbo_desc.Usage = D3D11_USAGE.DEFAULT;
+      triangle_vbo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+      triangle_vbo_desc.CPUAccessFlags = 0;
+      triangle_vbo_desc.StructureByteStride = D3D11TriangleVertex.sizeof;
+      D3D11_SUBRESOURCE_DATA triangle_vbo_data;
+      triangle_vbo_data.pSysMem = vertices.ptr;
+      hr = d3d11.device.CreateBuffer(&triangle_vbo_desc, &triangle_vbo_data, &d3d11.triangle_vbo);
+      if (hr < 0) goto error;
+
+      D3D11_BUFFER_DESC triangle_ebo_desc;
+      triangle_ebo_desc.ByteWidth = elements.length * ushort.sizeof;
+      triangle_ebo_desc.Usage = D3D11_USAGE.DEFAULT;
+      triangle_ebo_desc.BindFlags = D3D11_BIND_FLAG.INDEX_BUFFER;
+      triangle_ebo_desc.CPUAccessFlags = 0;
+      triangle_ebo_desc.StructureByteStride = ushort.sizeof;
+      D3D11_SUBRESOURCE_DATA triangle_ebo_data;
+      triangle_ebo_data.pSysMem = elements.ptr;
+      hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
+      if (hr < 0) goto error;
+
       d3d11.initted = true;
       return;
     }
@@ -66,6 +166,12 @@ version (D3D11) {
   }
 
   void d3d11_deinit() {
+    if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
+    if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
+    if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
+    if (d3d11.triangle_pshader) d3d11.triangle_pshader.Release();
+    if (d3d11.triangle_vshader) d3d11.triangle_vshader.Release();
+
     if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
     if (d3d11.ctx) d3d11.ctx.Release();
     if (d3d11.device) d3d11.device.Release();
@@ -98,9 +204,30 @@ version (D3D11) {
 
   void d3d11_present() {
     if (!d3d11.initted) return;
+
     __gshared immutable float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
-    d3d11.swapchain.Present(0, 0);
+
+    d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, null);
+    D3D11_VIEWPORT viewport;
+    viewport.TopLeftX = 0.0;
+    viewport.TopLeftY = 0.0;
+    viewport.Width = platform_size[0];
+    viewport.Height = platform_size[1];
+    viewport.MinDepth = 0.0;
+    viewport.MaxDepth = 1.0;
+    d3d11.ctx.RSSetViewports(1, &viewport);
+    d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
+    d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
+    d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
+    uint stride = D3D11TriangleVertex.sizeof;
+    uint offset = 0;
+    d3d11.ctx.IASetVertexBuffers(0, 1, &d3d11.triangle_vbo, &stride, &offset);
+    d3d11.ctx.IASetIndexBuffer(d3d11.triangle_ebo, DXGI_FORMAT.R16_UINT, 0);
+    d3d11.ctx.IASetInputLayout(d3d11.triangle_input_layout);
+    d3d11.ctx.DrawIndexed(cast(uint) elements.length, 0, 0);
+
+    d3d11.swapchain.Present(1, 0);
   }
 
   __gshared immutable d3d11_renderer = Platform_Renderer(
@@ -112,6 +239,7 @@ version (D3D11) {
 
   pragma(lib, "d3d11");
   pragma(lib, "dxgi");
+  pragma(lib, "d3dcompiler");
 }
 
 version (OpenGL) {
@@ -291,19 +419,11 @@ version (OpenGL) {
     glDeleteShader(fshader);
     glDeleteShader(vshader);
 
-    __gshared immutable OpenGLTriangleVertex[4] vertices = [
-      OpenGLTriangleVertex([-0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
-      OpenGLTriangleVertex([+0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
-      OpenGLTriangleVertex([+0.5, +0.5, 0.0], [0.0, 0.0, 1.0, 1.0]),
-      OpenGLTriangleVertex([-0.5, +0.5, 0.0], [1.0, 0.0, 1.0, 1.0]),
-    ];
-    __gshared immutable ubyte[6] elements = [0, 1, 2, 2, 3, 0];
-
     glCreateBuffers(1, &opengl.triangle_vbo);
     glNamedBufferData(opengl.triangle_vbo, vertices.length * OpenGLTriangleVertex.sizeof, vertices.ptr, GL_STATIC_DRAW);
 
     glCreateBuffers(1, &opengl.triangle_ebo);
-    glNamedBufferData(opengl.triangle_ebo, elements.length * ubyte.sizeof, elements.ptr, GL_STATIC_DRAW);
+    glNamedBufferData(opengl.triangle_ebo, elements.length * ushort.sizeof, elements.ptr, GL_STATIC_DRAW);
 
     uint vbo_binding = 0;
     glCreateVertexArrays(1, &opengl.triangle_vao);
@@ -359,7 +479,7 @@ version (OpenGL) {
     glDisable(GL_CULL_FACE);
     glBindVertexArray(opengl.triangle_vao);
     glUseProgram(opengl.triangle_shader);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, cast(const(void)*) 0);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, cast(const(void)*) 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glClear(0); // NOTE(dfra): this fixes intel integrated gpus.

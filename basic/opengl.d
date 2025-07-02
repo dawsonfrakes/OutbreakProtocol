@@ -54,6 +54,7 @@ enum GL_DYNAMIC_DRAW = 0x88E8;
 enum GL_FRAGMENT_SHADER = 0x8B30;
 enum GL_VERTEX_SHADER = 0x8B31;
 enum GL_LOWER_LEFT = 0x8CA1;
+enum GL_UPPER_LEFT = 0x8CA2;
 
 @gl_version(2, 0) extern(System) uint glCreateProgram();
 @gl_version(2, 0) extern(System) void glAttachShader(uint, uint);

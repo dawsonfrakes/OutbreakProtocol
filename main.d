@@ -163,6 +163,8 @@ version (Windows) {
     ExitProcess(0);
   }
 
+  extern(Windows) int _fltused;
+
   pragma(linkerDirective, "-subsystem:windows");
   pragma(lib, "kernel32");
   pragma(lib, "user32");
