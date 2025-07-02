@@ -24,7 +24,7 @@ void main(string[] args) {
 
   switch (target.toLower()) {
     case "windows":
-      spawnProcess(split(compiler~" -betterC -debug -g -i -target=x64-windows -of=.build/OutbreakProtocol.exe main -L-incremental:no")).wait();
+      spawnProcess(split(compiler~" -betterC -debug -g -i -target="~(compiler == "dmd" ? "x64" : "amd64")~"-windows -of=.build/OutbreakProtocol.exe main -L-incremental:no")).wait();
       break;
     case "macos":
       spawnProcess(split(compiler~" -betterC -debug -g -i -target=arm64-macos -of=.build/OutbreakProtocol main")).wait();

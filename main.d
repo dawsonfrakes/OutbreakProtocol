@@ -3,6 +3,8 @@ import renderer;
 version (Windows) {
   import basic.windows;
 
+  enum platform_renderer = true ? d3d11_renderer : opengl_renderer;
+
   __gshared HINSTANCE platform_hinstance;
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
@@ -72,7 +74,7 @@ version (Windows) {
         case WM_SIZE:
           platform_size = [cast(ushort) lParam, cast(ushort) (lParam >> 16)];
 
-          d3d11_renderer.resize();
+          platform_renderer.resize();
           return 0;
         case WM_CREATE:
           platform_hwnd = hwnd;
@@ -83,10 +85,10 @@ version (Windows) {
           int round_mode = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
 
-          d3d11_renderer.init();
+          platform_renderer.init();
           return 0;
         case WM_DESTROY:
-          d3d11_renderer.deinit();
+          platform_renderer.deinit();
 
           PostQuitMessage(0);
           return 0;
@@ -137,7 +139,7 @@ version (Windows) {
         }
       }
 
-      d3d11_renderer.present();
+      platform_renderer.present();
 
       if (sleep_is_granular) {
         Sleep(1);

@@ -26,6 +26,7 @@ enum STD_ERROR_HANDLE = -12;
 
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
+alias PROC = extern(Windows) ptrdiff_t function();
 
 @foreign("kernel32") extern(Windows) HMODULE GetModuleHandleW(const(wchar)*);
 @foreign("kernel32") extern(Windows) void Sleep(uint);
@@ -151,6 +152,60 @@ struct MONITORINFO {
 @foreign("user32") extern(Windows) int SetWindowPlacement(HWND, const(WINDOWPLACEMENT)*);
 @foreign("user32") extern(Windows) HMONITOR MonitorFromWindow(HWND, uint);
 @foreign("user32") extern(Windows) int GetMonitorInfoW(HMONITOR, MONITORINFO*);
+
+// gdi32
+enum PFD_DOUBLEBUFFER = 0x00000001;
+enum PFD_DRAW_TO_WINDOW = 0x00000004;
+enum PFD_SUPPORT_OPENGL = 0x00000020;
+enum PFD_DEPTH_DONTCARE = 0x20000000;
+
+struct PIXELFORMATDESCRIPTOR {
+  ushort nSize;
+  ushort nVersion;
+  uint dwFlags;
+  ubyte iPixelType;
+  ubyte cColorBits;
+  ubyte cRedBits;
+  ubyte cRedShift;
+  ubyte cGreenBits;
+  ubyte cGreenShift;
+  ubyte cBlueBits;
+  ubyte cBlueShift;
+  ubyte cAlphaBits;
+  ubyte cAlphaShift;
+  ubyte cAccumBits;
+  ubyte cAccumRedBits;
+  ubyte cAccumGreenBits;
+  ubyte cAccumBlueBits;
+  ubyte cAccumAlphaBits;
+  ubyte cDepthBits;
+  ubyte cStencilBits;
+  ubyte cAuxBuffers;
+  ubyte iLayerType;
+  ubyte bReserved;
+  uint dwLayerMask;
+  uint dwVisibleMask;
+  uint dwDamageMask;
+}
+
+@foreign("gdi32") extern(Windows) int ChoosePixelFormat(HDC, const(PIXELFORMATDESCRIPTOR)*);
+@foreign("gdi32") extern(Windows) int SetPixelFormat(HDC, int, const(PIXELFORMATDESCRIPTOR)*);
+@foreign("gdi32") extern(Windows) int SwapBuffers(HDC);
+
+// opengl32
+enum WGL_CONTEXT_MAJOR_VERSION_ARB = 0x2091;
+enum WGL_CONTEXT_MINOR_VERSION_ARB = 0x2092;
+enum WGL_CONTEXT_FLAGS_ARB = 0x2094;
+enum WGL_CONTEXT_PROFILE_MASK_ARB = 0x9126;
+enum WGL_CONTEXT_DEBUG_BIT_ARB = 0x0001;
+enum WGL_CONTEXT_CORE_PROFILE_BIT_ARB = 0x00000001;
+
+struct HGLRC__; alias HGLRC = HGLRC__*;
+
+@foreign("opengl32") extern(Windows) HGLRC wglCreateContext(HDC);
+@foreign("opengl32") extern(Windows) int wglDeleteContext(HGLRC);
+@foreign("opengl32") extern(Windows) int wglMakeCurrent(HDC, HGLRC);
+@foreign("opengl32") extern(Windows) PROC wglGetProcAddress(const(char)*);
 
 // ws2_32
 enum WSADESCRIPTION_LEN = 256;
@@ -469,6 +524,11 @@ struct DXGI_SWAP_CHAIN_DESC {
   DXGI_SWAP_EFFECT SwapEffect;
   uint Flags;
 }
+enum DXGI_MWA : int {
+  NO_WINDOW_CHANGES = 0,
+  NO_ALT_ENTER = 1,
+  NO_PRINT_SCREEN = 2,
+}
 struct IDXGIObject {
   __gshared immutable uuidof = IID(0xAEC22FB8, 0x76F3, 0x4639, [0x9B, 0xE0, 0x28, 0xEB, 0x43, 0xA6, 0x7A, 0x2E]);
   struct VTable {
@@ -489,6 +549,17 @@ struct IDXGIOutput {
   }
   mixin COMClass;
 }
+struct IDXGIFactory {
+  __gshared immutable uuidof = IID(0x7B7166EC, 0x21C7, 0x44AE, [0xB2, 0x1A, 0xC9, 0xAE, 0x32, 0x1A, 0xE3, 0x69]);
+  struct VTable {
+    IDXGIObject.VTable idxgiobject_vtable;
+    alias this = idxgiobject_vtable;
+    extern(Windows) HRESULT function(void*, uint, IDXGIAdapter**) EnumAdapters;
+    extern(Windows) HRESULT function(void*, HWND, DXGI_MWA) MakeWindowAssociation;
+    // ...
+  }
+  mixin COMClass;
+}
 struct IDXGIAdapter {
   __gshared immutable uuidof = IID(0x2411E7E1, 0x12AC, 0x4CCF, [0xBD, 0x14, 0x97, 0x98, 0xE8, 0x53, 0x4D, 0xC0]);
   struct VTable {
@@ -497,6 +568,16 @@ struct IDXGIAdapter {
     extern(Windows) HRESULT function(void*, uint, IDXGIOutput**) EnumOutputs;
     extern(Windows) HRESULT function(void*, DXGI_ADAPTER_DESC*) GetDesc;
     extern(Windows) HRESULT function(void*, GUID*, ulong*) CheckInterfaceSupport;
+  }
+  mixin COMClass;
+}
+struct IDXGIDevice {
+  __gshared immutable uuidof = IID(0x54EC77FA, 0x1377, 0x44E6, [0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C]);
+  struct VTable {
+    IDXGIObject.VTable idxgiobject_vtable;
+    alias this = idxgiobject_vtable;
+    extern(Windows) HRESULT function(void*, IDXGIAdapter**) GetAdapter;
+    // ...
   }
   mixin COMClass;
 }

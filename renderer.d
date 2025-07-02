@@ -43,6 +43,20 @@ version (D3D11) {
         &swapchain_descriptor, &d3d11.swapchain, &d3d11.device, null, &d3d11.ctx);
       if (hr < 0) goto error;
 
+      IDXGIDevice* dxgi_device = void;
+      if (d3d11.swapchain.GetDevice(&dxgi_device.uuidof, cast(void**) &dxgi_device) >= 0) {
+        IDXGIAdapter* dxgi_adapter = void;
+        if (dxgi_device.GetAdapter(&dxgi_adapter) >= 0) {
+          IDXGIFactory* dxgi_factory = void;
+          if (dxgi_adapter.GetParent(&dxgi_factory.uuidof, cast(void**) &dxgi_factory) >= 0) {
+            dxgi_factory.MakeWindowAssociation(platform_hwnd, DXGI_MWA.NO_ALT_ENTER);
+            dxgi_factory.Release();
+          }
+          dxgi_adapter.Release();
+        }
+        dxgi_device.Release();
+      }
+
       d3d11.initted = true;
       return;
     }
@@ -79,12 +93,49 @@ version (D3D11) {
 
 version (OpenGL) {
   version (Windows) {
-    void opengl_platform_init() {
+    import main : platform_hdc;
+    import basic.windows;
 
+    struct OpenGLData {
+      HGLRC ctx;
+    }
+
+    __gshared OpenGLData opengl;
+
+    void opengl_platform_init() {
+      PIXELFORMATDESCRIPTOR pfd;
+      pfd.nSize = PIXELFORMATDESCRIPTOR.sizeof;
+      pfd.nVersion = 1;
+      pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER | PFD_DEPTH_DONTCARE;
+      pfd.cColorBits = 24;
+      const format = ChoosePixelFormat(platform_hdc, &pfd);
+      SetPixelFormat(platform_hdc, format, &pfd);
+
+      HGLRC temp_ctx = wglCreateContext(platform_hdc);
+      scope(exit) wglDeleteContext(temp_ctx);
+      wglMakeCurrent(platform_hdc, temp_ctx);
+
+      alias PFN_wglCreateContextAttribsARB = extern(Windows) HGLRC function(HDC, HGLRC, const(int)*);
+      auto wglCreateContextAttribsARB =
+        cast(PFN_wglCreateContextAttribsARB)
+        wglGetProcAddress("wglCreateContextAttribsARB");
+
+      debug enum flags = WGL_CONTEXT_DEBUG_BIT_ARB;
+      else  enum flags = 0;
+      immutable int[9] attribs = [
+        WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+        WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+        WGL_CONTEXT_FLAGS_ARB, flags,
+        WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+        0,
+      ];
+      opengl.ctx = wglCreateContextAttribsARB(platform_hdc, null, attribs.ptr);
+      wglMakeCurrent(platform_hdc, opengl.ctx);
     }
 
     void opengl_platform_deinit() {
-
+      if (opengl.ctx) wglDeleteContext(opengl.ctx);
+      opengl = opengl.init;
     }
 
     void opengl_platform_resize() {
@@ -92,8 +143,11 @@ version (OpenGL) {
     }
 
     void opengl_platform_present() {
-
+      SwapBuffers(platform_hdc);
     }
+
+    pragma(lib, "gdi32");
+    pragma(lib, "opengl32");
   }
 
   void opengl_init() {
@@ -122,6 +176,4 @@ version (OpenGL) {
     &opengl_resize,
     &opengl_present,
   );
-
-  version (Windows) pragma(lib, "opengl32");
 }
