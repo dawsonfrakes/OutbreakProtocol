@@ -29,6 +29,7 @@ alias HMODULE = HINSTANCE;
 alias PROC = extern(Windows) ptrdiff_t function();
 
 @foreign("kernel32") extern(Windows) HMODULE GetModuleHandleW(const(wchar)*);
+@foreign("kernel32") extern(Windows) PROC GetProcAddress(HMODULE, const(char)*);
 @foreign("kernel32") extern(Windows) void Sleep(uint);
 @foreign("kernel32") extern(Windows) int AllocConsole();
 @foreign("kernel32") extern(Windows) HANDLE GetStdHandle(uint);

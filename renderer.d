@@ -96,6 +96,19 @@ version (OpenGL) {
     import main : platform_hdc;
     import basic.windows;
 
+    static import basic.opengl;
+    static foreach (name; __traits(allMembers, basic.opengl)[1..$]) {
+      static if (is(typeof(__traits(getMember, basic.opengl, name)) == function)) {
+        static foreach (attribute; __traits(getAttributes, __traits(getMember, basic.opengl, name))) {
+          static if (is(typeof(attribute) == basic.opengl.gl_version)) {
+            mixin("__gshared "~(typeof(__traits(getMember, basic.opengl, name))*).stringof~" "~name~";");
+          }
+        }
+      } else {
+        mixin("alias "~name~" = basic.opengl."~name~";");
+      }
+    }
+
     struct OpenGLData {
       HGLRC ctx;
     }
@@ -131,6 +144,21 @@ version (OpenGL) {
       ];
       opengl.ctx = wglCreateContextAttribsARB(platform_hdc, null, attribs.ptr);
       wglMakeCurrent(platform_hdc, opengl.ctx);
+
+      HMODULE opengl32 = GetModuleHandleW("opengl32");
+      static foreach (name; __traits(allMembers, basic.opengl)[1..$]) {
+        static if (is(typeof(__traits(getMember, basic.opengl, name)))) {
+          static foreach (attribute; __traits(getAttributes, __traits(getMember, basic.opengl, name))) {
+            static if (is(typeof(attribute) == basic.opengl.gl_version)) {
+              static if (attribute.major == 1 && attribute.minor <= 1) {
+                mixin(name~" = cast(typeof("~name~")) GetProcAddress(opengl32, \""~name~"\");");
+              } else {
+                mixin(name~" = cast(typeof("~name~")) wglGetProcAddress(\""~name~"\");");
+              }
+            }
+          }
+        }
+      }
     }
 
     void opengl_platform_deinit() {
@@ -153,6 +181,8 @@ version (OpenGL) {
   void opengl_init() {
     static if (__traits(compiles, opengl_platform_init))
       opengl_platform_init();
+
+    glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
   }
 
   void opengl_deinit() {
