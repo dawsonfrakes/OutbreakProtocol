@@ -28,6 +28,10 @@ enum GL_RGBA = 0x1908;
 enum GL_POINT = 0x1B00;
 enum GL_LINE = 0x1B01;
 enum GL_FILL = 0x1B02;
+enum GL_VENDOR = 0x1F00;
+enum GL_RENDERER = 0x1F01;
+enum GL_VERSION = 0x1F02;
+enum GL_EXTENSIONS = 0x1F03;
 enum GL_NEAREST = 0x2600;
 enum GL_LINEAR = 0x2601;
 
@@ -36,6 +40,7 @@ enum GL_LINEAR = 0x2601;
 @gl_version(1, 0) extern(System) void glClearColor(float, float, float, float);
 @gl_version(1, 0) extern(System) void glClear(uint);
 @gl_version(1, 0) extern(System) void glGetIntegerv(uint, int*);
+@gl_version(1, 0) extern(System) const(char)* glGetString(uint);
 
 // 1.1
 @gl_version(1, 1) extern(System) void glDrawArrays(uint, int, uint);
@@ -46,7 +51,19 @@ enum GL_STATIC_DRAW = 0x88E4;
 enum GL_DYNAMIC_DRAW = 0x88E8;
 
 // 2.0
+enum GL_FRAGMENT_SHADER = 0x8B30;
+enum GL_VERTEX_SHADER = 0x8B31;
 enum GL_LOWER_LEFT = 0x8CA1;
+
+@gl_version(2, 0) extern(System) uint glCreateProgram();
+@gl_version(2, 0) extern(System) void glAttachShader(uint, uint);
+@gl_version(2, 0) extern(System) void glDetachShader(uint, uint);
+@gl_version(2, 0) extern(System) void glLinkProgram(uint);
+@gl_version(2, 0) extern(System) void glUseProgram(uint);
+@gl_version(2, 0) extern(System) uint glCreateShader(uint);
+@gl_version(2, 0) extern(System) void glDeleteShader(uint);
+@gl_version(2, 0) extern(System) void glShaderSource(uint, uint, const(char*)*, const(int)*);
+@gl_version(2, 0) extern(System) void glCompileShader(uint);
 
 // 3.0
 enum GL_RGBA16F = 0x881A;
@@ -57,6 +74,7 @@ enum GL_FRAMEBUFFER = 0x8D40;
 enum GL_RENDERBUFFER = 0x8D41;
 enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 
+@gl_version(3, 0) extern(System) void glBindFramebuffer(uint, uint);
 @gl_version(3, 0) extern(System) void glBindVertexArray(uint);
 
 // 3.2

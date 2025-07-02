@@ -93,7 +93,7 @@ version (D3D11) {
 
 version (OpenGL) {
   import main : platform_log;
-  import basic : max, min;
+  import basic : max, min, strlen;
 
   version (Windows) {
     import main : platform_hdc;
@@ -186,6 +186,7 @@ version (OpenGL) {
     uint main_fbo_color0;
     uint main_fbo_depth;
 
+    uint triangle_shader;
     uint triangle_vao;
     uint triangle_vbo;
     uint triangle_ebo;
@@ -193,8 +194,9 @@ version (OpenGL) {
 
   __gshared OpenGLData opengl;
 
-  align(16) struct OpenGLTriangleVertex {
+  struct OpenGLTriangleVertex {
     float[3] position;
+    float[4] color;
   }
 
   extern(System) void opengl_debug_proc(uint source, uint type, uint id, uint severity, uint length, const(char)* message, const(void)* param) {
@@ -208,6 +210,14 @@ version (OpenGL) {
     debug {
       glEnable(GL_DEBUG_OUTPUT);
       glDebugMessageCallback(&opengl_debug_proc, null);
+
+      platform_log("OpenGL Renderer Info:");
+      auto gl_vendor = glGetString(GL_VENDOR);
+      platform_log(gl_vendor[0..strlen(gl_vendor)]);
+      auto gl_renderer = glGetString(GL_RENDERER);
+      platform_log(gl_renderer[0..strlen(gl_renderer)]);
+      auto gl_version = glGetString(GL_VERSION);
+      platform_log(gl_version[0..strlen(gl_version)]);
     }
 
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
@@ -216,10 +226,53 @@ version (OpenGL) {
     glCreateRenderbuffers(1, &opengl.main_fbo_color0);
     glCreateRenderbuffers(1, &opengl.main_fbo_depth);
 
-    __gshared immutable OpenGLTriangleVertex[3] vertices = [
-      OpenGLTriangleVertex([-0.5, -0.5, 0.0]),
-      OpenGLTriangleVertex([+0.5, -0.5, 0.0]),
-      OpenGLTriangleVertex([+0.0, +0.5, 0.0]),
+    __gshared immutable const(char)*[1] vsrcs = [
+      `#version 450
+
+      layout(location = 0) in vec3 a_position;
+      layout(location = 1) in vec4 a_color;
+
+      layout(location = 1) out vec4 f_color;
+
+      void main() {
+        gl_Position = vec4(a_position, 1.0);
+        f_color = a_color;
+      }`,
+    ];
+    uint vshader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vshader, vsrcs.length, vsrcs.ptr, null);
+    glCompileShader(vshader);
+
+    __gshared immutable const(char)*[1] fsrcs = [
+      `#version 450
+
+      layout(location = 1) in vec4 f_color;
+
+      layout(location = 0) out vec4 color;
+
+      void main() {
+        color = f_color;
+      }`,
+    ];
+    uint fshader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fshader, fsrcs.length, fsrcs.ptr, null);
+    glCompileShader(fshader);
+
+    opengl.triangle_shader = glCreateProgram();
+    glAttachShader(opengl.triangle_shader, vshader);
+    glAttachShader(opengl.triangle_shader, fshader);
+    glLinkProgram(opengl.triangle_shader);
+    glDetachShader(opengl.triangle_shader, fshader);
+    glDetachShader(opengl.triangle_shader, vshader);
+
+    glDeleteShader(fshader);
+    glDeleteShader(vshader);
+
+    __gshared immutable OpenGLTriangleVertex[4] vertices = [
+      OpenGLTriangleVertex([-0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
+      OpenGLTriangleVertex([+0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
+      OpenGLTriangleVertex([+0.5, +0.5, 0.0], [0.0, 0.0, 1.0, 1.0]),
+      OpenGLTriangleVertex([-0.5, +0.5, 0.0], [1.0, 0.0, 1.0, 1.0]),
     ];
     __gshared immutable ubyte[6] elements = [0, 1, 2, 2, 3, 0];
 
@@ -238,6 +291,11 @@ version (OpenGL) {
     glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
     glVertexArrayAttribBinding(opengl.triangle_vao, position_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, OpenGLTriangleVertex.position.offsetof);
+
+    uint color_attrib = 1;
+    glEnableVertexArrayAttrib(opengl.triangle_vao, color_attrib);
+    glVertexArrayAttribBinding(opengl.triangle_vao, color_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, OpenGLTriangleVertex.color.offsetof);
   }
 
   void opengl_deinit() {
@@ -273,10 +331,15 @@ version (OpenGL) {
     __gshared immutable clear_depth = [0.0f];
     glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, clear_depth.ptr);
 
+    glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(opengl.triangle_vao);
+    glUseProgram(opengl.triangle_shader);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, cast(const(void)*) 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClear(0); // NOTE(dfra): this fixes intel integrated gpus.
 
     glEnable(GL_FRAMEBUFFER_SRGB);
     glBlitNamedFramebuffer(opengl.main_fbo, 0,
