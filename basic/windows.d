@@ -463,6 +463,10 @@ struct D3D11_INPUT_ELEMENT_DESC {
   D3D11_INPUT_CLASSIFICATION InputSlotClass;
   uint InstanceDataStepRate;
 }
+enum D3D11_CPU_ACCESS_FLAG : int {
+  WRITE = 0x10000,
+  READ = 0x20000,
+}
 struct ID3D11Device {
   __gshared immutable uuidof = IID(0xDB6F6DDB, 0xAC77, 0x4E88, [0x82, 0x53, 0x81, 0x9D, 0xF9, 0xBB, 0xF1, 0x40]);
   struct VTable {
@@ -565,7 +569,7 @@ struct ID3D11DeviceContext {
   struct VTable {
     ID3D11DeviceChild.VTable id3d11devicechild_vtable;
     alias this = id3d11devicechild_vtable;
-    void* VSSetConstantBuffers;
+    extern(Windows) void function(void*, uint, uint, const(ID3D11Buffer*)*) VSSetConstantBuffers;
     void* PSSetShaderResources;
     extern(Windows) void function(void*, ID3D11PixelShader*, const(ID3D11ClassInstance*)*, uint) PSSetShader;
     void* PSSetSamplers;

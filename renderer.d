@@ -23,6 +23,19 @@ __gshared immutable TriangleVertex[4] vertices = [
 ];
 __gshared immutable ushort[6] elements = [0, 1, 2, 2, 3, 0];
 
+struct TriangleUniformObject {
+  align(16) float[16] world_transform;
+}
+
+__gshared immutable auto uniform = TriangleUniformObject(
+  world_transform: [
+    0.5, 0.0, 0.0, 0.0,
+    0.0, 0.5, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+  ],
+);
+
 version (D3D11) {
   import main : platform_hwnd, platform_size;
   import basic.windows;
@@ -39,6 +52,7 @@ version (D3D11) {
     ID3D11InputLayout* triangle_input_layout;
     ID3D11Buffer* triangle_vbo;
     ID3D11Buffer* triangle_ebo;
+    ID3D11Buffer* triangle_ubo;
   }
 
   __gshared D3D11Data d3d11;
@@ -89,10 +103,13 @@ version (D3D11) {
         float4 position : SV_Position;
         float4 color : Color;
       };
+      cbuffer TriangleUniformObject {
+        matrix transform;
+      };
 
       VOutput vmain(VInput input) {
         VOutput output;
-        output.position = float4(input.position, 1.0f);
+        output.position = mul(float4(input.position, 1.0f), transform);
         output.color = input.color;
         return output;
       }
@@ -158,6 +175,17 @@ version (D3D11) {
       hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
       if (hr < 0) goto error;
 
+      D3D11_BUFFER_DESC triangle_ubo_desc;
+      triangle_ubo_desc.ByteWidth = uniform.sizeof;
+      triangle_ubo_desc.Usage = D3D11_USAGE.DYNAMIC;
+      triangle_ubo_desc.BindFlags = D3D11_BIND_FLAG.CONSTANT_BUFFER;
+      triangle_ubo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
+      triangle_ubo_desc.StructureByteStride = 0;
+      D3D11_SUBRESOURCE_DATA triangle_ubo_data;
+      triangle_ubo_data.pSysMem = &uniform;
+      hr = d3d11.device.CreateBuffer(&triangle_ubo_desc, &triangle_ubo_data, &d3d11.triangle_ubo);
+      if (hr < 0) goto error;
+
       d3d11.initted = true;
       return;
     }
@@ -166,6 +194,7 @@ version (D3D11) {
   }
 
   void d3d11_deinit() {
+    if (d3d11.triangle_ubo) d3d11.triangle_ubo.Release();
     if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
     if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
     if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
@@ -180,7 +209,7 @@ version (D3D11) {
   }
 
   void d3d11_resize() {
-    if (platform_size[0] == 0 || platform_size[1] == 0) return;
+    if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
     HRESULT hr = void;
     {
       if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
@@ -218,6 +247,7 @@ version (D3D11) {
     viewport.MaxDepth = 1.0;
     d3d11.ctx.RSSetViewports(1, &viewport);
     d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
+    d3d11.ctx.VSSetConstantBuffers(0, 1, &d3d11.triangle_ubo);
     d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
     d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
     uint stride = D3D11TriangleVertex.sizeof;
@@ -380,13 +410,15 @@ version (OpenGL) {
     __gshared immutable const(char)*[1] vsrcs = [
       `#version 450
 
+      layout(location = 0) uniform mat4 u_transform;
+
       layout(location = 0) in vec3 a_position;
       layout(location = 1) in vec4 a_color;
 
       layout(location = 1) out vec4 f_color;
 
       void main() {
-        gl_Position = vec4(a_position, 1.0);
+        gl_Position = u_transform * vec4(a_position, 1.0);
         f_color = a_color;
       }`,
     ];
@@ -478,6 +510,7 @@ version (OpenGL) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(opengl.triangle_vao);
+    glProgramUniformMatrix4fv(opengl.triangle_shader, 0, 1, true, uniform.world_transform.ptr);
     glUseProgram(opengl.triangle_shader);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, cast(const(void)*) 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

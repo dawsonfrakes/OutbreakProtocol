@@ -82,6 +82,9 @@ enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
 
+// 4.1
+@gl_version(4, 1) extern(System) void glProgramUniformMatrix4fv(uint, int, uint, bool, const(float)*);
+
 // 4.3
 enum GL_DEBUG_OUTPUT = 0x92E0;
 
