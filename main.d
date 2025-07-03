@@ -3,7 +3,7 @@ import renderer;
 version (Windows) {
   import basic.windows;
 
-  enum platform_renderer = true ? d3d11_renderer : opengl_renderer;
+  enum platform_renderer = false ? d3d11_renderer : opengl_renderer;
 
   __gshared HINSTANCE platform_hinstance;
   __gshared HWND platform_hwnd;
@@ -209,5 +209,13 @@ version (WebAssembly) {
 
   extern(C) void _start() {
     console_log("Hello, world!\n");
+  }
+}
+
+version(D_BetterC) {
+  extern(C) float* _memsetFloat(float* p, float value, size_t count) {
+    float *start = p;
+    for (float* end = &p[count]; p < end; p += 1) *p = value;
+    return start;
   }
 }

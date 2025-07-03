@@ -15,8 +15,6 @@ template COMClass() {
   auto opDispatch(string s, T...)(T args) => mixin("_vtable.", s)(&this, args);
 }
 
-auto min(A, B)(A a, B b) => a < b ? a : b;
-auto max(A, B)(A a, B b) => a > b ? a : b;
 ptrdiff_t strlen(const(char)* s) {
   const(char)* start = s;
   while (*s) s += 1;
