@@ -1,6 +1,22 @@
 #import "Simple";
 
 HRESULT :: #type,distinct s32;
+PROC :: #type () -> ssize #c_call;
+GUID :: struct {
+    Data1: u32;
+    Data2: u16;
+    Data3: u16;
+    Data4: [8]u8;
+}
+IID :: GUID;
+IUnknown_VTable :: struct {
+  QueryInterface: (*IUnknown, *IID, **void) -> HRESULT #cpp_method;
+  AddRef: (*IUnknown) -> u32 #cpp_method;
+  Release: (*IUnknown) -> u32 #cpp_method;
+}
+IUnknown :: struct {
+  using _iunknown_vtable: *IUnknown_VTable;
+}
 
 kernel32 :: #library,system "kernel32";
 
@@ -8,6 +24,7 @@ HINSTANCE :: *struct {};
 HMODULE :: HINSTANCE;
 
 GetModuleHandleW :: (name: *u16) -> HMODULE #foreign kernel32;
+Sleep :: (milliseconds: u32) #foreign kernel32;
 ExitProcess :: (exit_code: u32) -> noreturn #foreign kernel32;
 
 user32 :: #library,system "user32";
@@ -119,6 +136,7 @@ DispatchMessageW :: (msg: *MSG) -> ssize #foreign user32;
 DefWindowProcW :: (hwnd: HWND, message: u32, wParam: usize, lParam: ssize) -> ssize #foreign user32;
 PostQuitMessage :: (status: s32) #foreign user32;
 GetDC :: (hwnd: HWND) -> HDC #foreign user32;
+ClipCursor :: (rect: *RECT) -> s32 #foreign user32;
 DestroyWindow :: (hwnd: HWND) -> s32 #foreign user32;
 ValidateRect :: (hwnd: HWND, rect: *RECT) -> s32 #foreign user32;
 GetWindowLongPtrW :: (hwnd: HWND, index: s32) -> ssize #foreign user32;
@@ -128,6 +146,50 @@ SetWindowPlacement :: (hwnd: HWND, placement: *WINDOWPLACEMENT) -> s32 #foreign 
 SetWindowPos :: (hwnd: HWND, after: HWND, x: s32, y: s32, w: s32, h: s32, flags: u32) -> s32 #foreign user32;
 MonitorFromWindow :: (hwnd: HWND, flags: u32) -> HMONITOR #foreign user32;
 GetMonitorInfoW :: (monitor: HMONITOR, info: *MONITORINFO) -> s32 #foreign user32;
+
+gdi32 :: #library,system "gdi32";
+
+PIXELFORMATDESCRIPTOR :: struct {
+  nSize: u16;
+  nVersion: u16;
+  dwFlags: u32;
+  iPixelType: u8;
+  cColorBits: u8;
+  cRedBits: u8;
+  cRedShift: u8;
+  cGreenBits: u8;
+  cGreenShift: u8;
+  cBlueBits: u8;
+  cBlueShift: u8;
+  cAlphaBits: u8;
+  cAlphaShift: u8;
+  cAccumBits: u8;
+  cAccumRedBits: u8;
+  cAccumGreenBits: u8;
+  cAccumBlueBits: u8;
+  cAccumAlphaBits: u8;
+  cDepthBits: u8;
+  cStencilBits: u8;
+  cAuxBuffers: u8;
+  iLayerType: u8;
+  bReserved: u8;
+  dwLayerMask: u32;
+  dwVisibleMask: u32;
+  dwDamageMask: u32;
+}
+
+ChoosePixelFormat :: (hdc: HDC, pfd: *PIXELFORMATDESCRIPTOR) -> s32 #foreign gdi32;
+SetPixelFormat :: (hdc: HDC, format: s32, pfd: *PIXELFORMATDESCRIPTOR) -> s32 #foreign gdi32;
+SwapBuffers :: (hdc: HDC) -> s32 #foreign gdi32;
+
+opengl32 :: #library,system "opengl32";
+
+HGLRC :: *struct {};
+
+wglCreateContext :: (hdc: HDC) -> HGLRC #foreign opengl32;
+wglDeleteContext :: (ctx: HGLRC) -> s32 #foreign opengl32;
+wglMakeCurrent :: (hdc: HDC, ctx: HGLRC) -> s32 #foreign opengl32;
+wglGetProcAddress :: (name: *u8) -> PROC #foreign opengl32;
 
 ws2_32 :: #library,system "ws2_32";
 
@@ -174,3 +236,53 @@ winmm :: #library,system "winmm";
 TIMERR_NOERROR :: 0;
 
 timeBeginPeriod :: (interval: u32) -> u32 #foreign winmm;
+
+d3d11_library :: #library,system "d3d11";
+
+ID3D11Device_VTable :: struct {
+  using iunknown_vtable: IUnknown_VTable;
+  CreateBuffer: *void;
+  CreateTexture1D: *void;
+  CreateTexture2D: *void;
+  CreateTexture3D: *void;
+  CreateShaderResourceView: *void;
+  CreateUnorderedAccessView: *void;
+  CreateRenderTargetView: *void;
+  CreateDepthStencilView: *void;
+  CreateInputLayout: *void;
+  CreateVertexShader: *void;
+  CreateGeometryShader: *void;
+  CreateGeometryShaderWithStreamOutput: *void;
+  CreatePixelShader: *void;
+  CreateHullShader: *void;
+  CreateDomainShader: *void;
+  CreateComputeShader: *void;
+  CreateClassLinkage: *void;
+  CreateBlendState: *void;
+  CreateDepthStencilState: *void;
+  CreateRasterizerState: *void;
+  CreateSamplerState: *void;
+  CreateQuery: *void;
+  CreatePredicate: *void;
+  CreateCounter: *void;
+  CreateDeferredContext: *void;
+  OpenSharedResource: *void;
+  CheckFormatSupport: *void;
+  CheckMultisampleQualityLevels: *void;
+  CheckCounterInfo: *void;
+  CheckCounter: *void;
+  CheckFeatureSupport: *void;
+  GetPrivateData: *void;
+  SetPrivateData: *void;
+  SetPrivateDataInterface: *void;
+  GetFeatureLevel: *void;
+  GetCreationFlags: *void;
+  GetDeviceRemovedReason: *void;
+  GetImmediateContext: *void;
+  SetExceptionMode: *void;
+  GetExceptionMode: *void;
+}
+ID3D11Device :: struct {
+  #as iunknown: IUnknown;
+  #place iunknown; using _id3d11device_vtable: *ID3D11Device_VTable;
+}

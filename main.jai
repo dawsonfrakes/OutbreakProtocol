@@ -1,18 +1,22 @@
 #import "Simple";
 
+#load "renderers.jai";
+
 #if OS == .WINDOWS {
   #import "OP_Windows";
 
-  utf16lez :: ($s: string) -> [s.count + 1]u16 {
+  utf16lez :: ($s: string) -> [s.count + 1]u16 #no_context {
     result: [s.count + 1]u16;
     for s result[it_index] = it;
     return result;
   }
 
+  RENDERERS :: Platform_Renderers.D3D11 | .OPENGL;
   platform_hinstance: HINSTANCE;
   platform_hwnd: HWND;
   platform_hdc: HDC;
   platform_size: [2]u16;
+  platform_renderer := d3d11_renderer;
 
   toggle_fullscreen_save_placement := WINDOWPLACEMENT.{length=size_of(WINDOWPLACEMENT)};
   toggle_fullscreen :: () #no_context {
@@ -36,7 +40,7 @@
   }
 
   update_cursor_clip :: () #no_context {
-
+    ClipCursor(null);
   }
 
   clear_held_keys :: () #no_context {
@@ -66,6 +70,10 @@
           tabbing_in := wParam != 0;
           if tabbing_in update_cursor_clip();
           else clear_held_keys();
+        case WM_SIZE;
+          platform_size = .[cast,no_check(u16) lParam, cast,no_check(u16) (lParam >> 16)];
+
+          platform_renderer.resize();
         case WM_CREATE;
           platform_hwnd = hwnd;
           platform_hdc = GetDC(hwnd);
@@ -74,9 +82,11 @@
           DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, *dark_mode, 4);
           round_mode: s32 = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, *round_mode, 4);
-        case WM_SIZE;
-          platform_size = .[cast,no_check(u16) lParam, cast,no_check(u16) (lParam >> 16)];
+
+          platform_renderer.init();
         case WM_DESTROY;
+          platform_renderer.deinit();
+
           PostQuitMessage(0);
         case WM_SYSCOMMAND;
           if wParam == SC_KEYMENU return 0;
@@ -124,6 +134,12 @@
           case;
             DispatchMessageW(*msg);
         }
+      }
+
+      platform_renderer.present();
+
+      if sleep_is_granular {
+        Sleep(1);
       }
     }
 
