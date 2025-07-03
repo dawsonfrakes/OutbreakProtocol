@@ -40,6 +40,7 @@ TriangleUniformObject get_uniform_object() {
 
 version (D3D11) {
   import main : platform_hwnd, platform_size;
+  import basic : memcpy;
   import basic.windows;
 
   struct D3D11Data {
@@ -240,13 +241,12 @@ version (D3D11) {
     __gshared immutable float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
 
-    // TODO(dfra): update constant buffer every frame. [d3d11]
-    // D3D11_MAPPED_SUBRESOURCE mapped = void;
-    // HRESULT hr = d3d11.ctx.Map(d3d11.triangle_ubo, 0, D3D11_MAP_WRITE.DISCARD, 0, &mapped);
-    // if (hr >= 0) {
-    //   memcpy(mapped.pData, get_uniform_buffer().world_transform.ptr, TriangleUniformObject.sizeof);
-    //   d3d11.ctx.Unmap(d3d11.triangle_ubo, 0);
-    // }
+    D3D11_MAPPED_SUBRESOURCE mapped = void;
+    HRESULT hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ubo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapped);
+    if (hr >= 0) {
+      memcpy(mapped.pData, get_uniform_object().world_transform.ptr, TriangleUniformObject.sizeof);
+      d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.triangle_ubo, 0);
+    }
 
     d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, null);
     D3D11_VIEWPORT viewport;
@@ -268,7 +268,8 @@ version (D3D11) {
     d3d11.ctx.IASetInputLayout(d3d11.triangle_input_layout);
     d3d11.ctx.DrawIndexed(cast(uint) elements.length, 0, 0);
 
-    d3d11.swapchain.Present(1, 0);
+    hr = d3d11.swapchain.Present(1, 0);
+    if (hr < 0) {} // TODO(dfra): handle this?
   }
 
   __gshared immutable d3d11_renderer = Platform_Renderer(

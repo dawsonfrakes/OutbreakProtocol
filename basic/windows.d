@@ -467,6 +467,18 @@ enum D3D11_CPU_ACCESS_FLAG : int {
   WRITE = 0x10000,
   READ = 0x20000,
 }
+struct D3D11_MAPPED_SUBRESOURCE {
+  void* pData;
+  uint RowPitch;
+  uint DepthPitch;
+}
+enum D3D11_MAP : int {
+  READ = 1,
+  WRITE = 2,
+  READ_WRITE = 3,
+  WRITE_DISCARD = 4,
+  WRITE_NO_OVERWRITE = 5,
+}
 struct ID3D11Device {
   __gshared immutable uuidof = IID(0xDB6F6DDB, 0xAC77, 0x4E88, [0x82, 0x53, 0x81, 0x9D, 0xF9, 0xBB, 0xF1, 0x40]);
   struct VTable {
@@ -576,8 +588,8 @@ struct ID3D11DeviceContext {
     extern(Windows) void function(void*, ID3D11VertexShader*, const(ID3D11ClassInstance*)*, uint) VSSetShader;
     extern(Windows) void function(void*, uint, uint, int) DrawIndexed;
     extern(Windows) void function(void*, uint, uint) Draw;
-    void* Map;
-    void* Unmap;
+    extern(Windows) HRESULT function(void*, ID3D11Resource*, uint, D3D11_MAP, uint, D3D11_MAPPED_SUBRESOURCE*) Map;
+    extern(Windows) void function(void*, ID3D11Resource*, uint) Unmap;
     void* PSSetConstantBuffers;
     extern(Windows) void function(void*, ID3D11InputLayout*) IASetInputLayout;
     extern(Windows) void function(void*, uint, uint, const(ID3D11Buffer*)*, const(uint)*, const(uint)*) IASetVertexBuffers;
