@@ -29,8 +29,6 @@ null_renderer :: Platform_Renderer.{
     while label := true {
       hr: HRESULT = ---;
 
-      d3d11.device.Release(d3d11.device);
-
       // hr = D3D11CreateDeviceAndSwapChain();
       // if hr < 0 break label;
 
@@ -41,6 +39,7 @@ null_renderer :: Platform_Renderer.{
   }
 
   d3d11_deinit :: () #no_context {
+    if d3d11.device d3d11.device.Release(d3d11.device);
     d3d11 = .{};
   }
 
