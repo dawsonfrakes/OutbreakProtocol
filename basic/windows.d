@@ -21,8 +21,12 @@ struct IUnknown {
 }
 
 // kernel32
+enum STD_INPUT_HANDLE = -10;
 enum STD_OUTPUT_HANDLE = -11;
 enum STD_ERROR_HANDLE = -12;
+enum MEM_COMMIT = 0x00001000;
+enum MEM_RESERVE = 0x00002000;
+enum PAGE_READWRITE = 0x04;
 
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
@@ -34,6 +38,8 @@ alias PROC = extern(Windows) ptrdiff_t function();
 @foreign("kernel32") extern(Windows) int AllocConsole();
 @foreign("kernel32") extern(Windows) HANDLE GetStdHandle(uint);
 @foreign("kernel32") extern(Windows) int WriteFile(HANDLE, const(void)*, uint, uint*, void*);
+@foreign("kernel32") extern(Windows) int ReadFile(HANDLE, void*, uint, uint*, void*);
+@foreign("kernel32") extern(Windows) void* VirtualAlloc(void*, size_t, uint, uint);
 @foreign("kernel32") extern(Windows) noreturn ExitProcess(uint);
 
 // user32

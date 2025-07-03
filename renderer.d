@@ -1,3 +1,4 @@
+static import game;
 import basic.maths : cos, sin, M4, V3, min, max;
 
 version (Windows) {
@@ -9,7 +10,7 @@ struct Platform_Renderer {
   void function() init;
   void function() deinit;
   void function() resize;
-  void function() present;
+  void function(game.Renderer*) present;
 }
 
 struct TriangleVertex {
@@ -235,11 +236,10 @@ version (D3D11) {
     d3d11_deinit();
   }
 
-  void d3d11_present() {
+  void d3d11_present(game.Renderer* game_renderer) {
     if (!d3d11.initted) return;
 
-    __gshared immutable float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
-    d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
+    d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
 
     D3D11_MAPPED_SUBRESOURCE mapped = void;
     HRESULT hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ubo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapped);
@@ -509,14 +509,12 @@ version (OpenGL) {
     glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, opengl.main_fbo_depth);
   }
 
-  void opengl_present() {
+  void opengl_present(game.Renderer* game_renderer) {
     static if (__traits(compiles, opengl_platform_present))
       opengl_platform_present();
 
-    __gshared immutable clear_color0 = [0.6f, 0.2f, 0.2f, 1.0f];
-    glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, clear_color0.ptr);
-    __gshared immutable clear_depth = [0.0f];
-    glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, clear_depth.ptr);
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &game_renderer.clear_depth);
 
     glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
     glDisable(GL_DEPTH_TEST);

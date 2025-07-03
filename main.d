@@ -1,14 +1,28 @@
+static import game;
 import renderer;
 
 version (Windows) {
   import basic.windows;
 
-  enum platform_renderer = true ? d3d11_renderer : opengl_renderer;
+  version (assert) {
+    import basic : strlen;
+    extern(C) noreturn _assert(const(char)* exp, const(char)* file, uint line) {
+      platform_error("assertion failed");
+      platform_error(file[0..strlen(file)]);
+      platform_error(exp[0..strlen(exp)]);
+      char buf = void;
+      ReadFile(platform_stdin, &buf, 1, null, null);
+      ExitProcess(1);
+    }
+  }
+
+  enum platform_renderer = false ? d3d11_renderer : opengl_renderer;
 
   __gshared HINSTANCE platform_hinstance;
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
   __gshared ushort[2] platform_size;
+  debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
 
@@ -58,6 +72,7 @@ version (Windows) {
 
     debug {
       AllocConsole();
+      platform_stdin = GetStdHandle(STD_INPUT_HANDLE);
       platform_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
       platform_stderr = GetStdHandle(STD_ERROR_HANDLE);
     }
@@ -66,6 +81,13 @@ version (Windows) {
     bool networking_supported = WSAStartup(0x202, &wsadata) == 0;
 
     bool sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR;
+
+    size_t game_memory_size = 1 * 1024 * 1024 * 1024;
+    debug void* game_memory_base = cast(void*) 0x2000000;
+    else  void* game_memory_base = null;
+    ubyte* game_memory_data = cast(ubyte*) VirtualAlloc(game_memory_base, game_memory_size,
+      MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    ubyte[] game_memory = game_memory_data[0..game_memory_size];
 
     SetProcessDPIAware();
     WNDCLASSEXW wndclass;
@@ -151,7 +173,9 @@ version (Windows) {
         }
       }
 
-      platform_renderer.present();
+      game.Renderer game_renderer;
+      game.update_and_render(game_memory, &game_renderer);
+      platform_renderer.present(&game_renderer);
 
       if (sleep_is_granular) {
         Sleep(1);
