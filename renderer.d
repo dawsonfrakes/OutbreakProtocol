@@ -26,19 +26,6 @@ __gshared immutable TriangleVertex[4] vertices = [
 ];
 __gshared immutable ushort[6] elements = [0, 1, 2, 2, 3, 0];
 
-struct TriangleUniformObject {
-  M4 world_transform;
-}
-
-TriangleUniformObject get_uniform_object() {
-  __gshared float turns = 0.0;
-  turns += 0.001;
-  return TriangleUniformObject(
-    M4.translate(V3(cos(turns) * 0.2, sin(turns) * 0.2, 0.0)) *
-    M4.rotateZ(turns),
-  );
-}
-
 version (D3D11) {
   import main : platform_hwnd, platform_size;
   import basic : memcpy;
@@ -107,7 +94,7 @@ version (D3D11) {
         float4 position : SV_Position;
         float4 color : Color;
       };
-      cbuffer TriangleUniformObject {
+      cbuffer TriangleUniform {
         matrix transform;
       };
 
@@ -180,15 +167,12 @@ version (D3D11) {
       if (hr < 0) goto error;
 
       D3D11_BUFFER_DESC triangle_ubo_desc;
-      triangle_ubo_desc.ByteWidth = TriangleUniformObject.sizeof;
+      triangle_ubo_desc.ByteWidth = game.TriangleUniformObject.sizeof;
       triangle_ubo_desc.Usage = D3D11_USAGE.DYNAMIC;
       triangle_ubo_desc.BindFlags = D3D11_BIND_FLAG.CONSTANT_BUFFER;
       triangle_ubo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
       triangle_ubo_desc.StructureByteStride = 0;
-      D3D11_SUBRESOURCE_DATA triangle_ubo_data;
-      auto uniform = get_uniform_object();
-      triangle_ubo_data.pSysMem = &uniform;
-      hr = d3d11.device.CreateBuffer(&triangle_ubo_desc, &triangle_ubo_data, &d3d11.triangle_ubo);
+      hr = d3d11.device.CreateBuffer(&triangle_ubo_desc, null, &d3d11.triangle_ubo);
       if (hr < 0) goto error;
 
       d3d11.initted = true;
@@ -239,12 +223,14 @@ version (D3D11) {
   void d3d11_present(game.Renderer* game_renderer) {
     if (!d3d11.initted) return;
 
+    auto uniform = game_renderer.triangles[0];
+
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
 
     D3D11_MAPPED_SUBRESOURCE mapped = void;
     HRESULT hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ubo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapped);
     if (hr >= 0) {
-      memcpy(mapped.pData, get_uniform_object().world_transform.ptr, TriangleUniformObject.sizeof);
+      memcpy(mapped.pData, uniform.world_transform.ptr, uniform.sizeof);
       d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.triangle_ubo, 0);
     }
 
@@ -520,7 +506,7 @@ version (OpenGL) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(opengl.triangle_vao);
-    auto uniform = get_uniform_object();
+    auto uniform = game_renderer.triangles[0];
     glProgramUniformMatrix4fv(opengl.triangle_shader, 0, 1, true, uniform.world_transform.ptr);
     glUseProgram(opengl.triangle_shader);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, cast(const(void)*) 0);
