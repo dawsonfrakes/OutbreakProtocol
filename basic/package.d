@@ -24,3 +24,8 @@ struct uda {}
 @uda struct foreign {
   string library;
 }
+
+template COMClass() {
+  VTable* vtable;
+  auto opDispatch(string s, Ts...)(Ts args) => mixin("vtable."~s)(&this, args);
+}

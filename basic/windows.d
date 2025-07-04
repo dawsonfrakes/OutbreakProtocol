@@ -5,6 +5,21 @@ import basic;
 alias HANDLE = void*;
 alias HRESULT = s32;
 alias PROC = extern(Windows) ssize function();
+struct GUID {
+  u32 Data1;
+  u16 Data2;
+  u16 Data3;
+  u8[8] Data4;
+}
+alias IID = const(GUID);
+struct IUnknown {
+  struct VTable {
+    HRESULT function(void*, IID*, void**) QueryInterface;
+    u32 function(void*) AddRef;
+    u32 function(void*) Release;
+  }
+  mixin COMClass;
+}
 
 // kernel32
 enum STD_INPUT_HANDLE = -10;
@@ -178,3 +193,177 @@ enum DWMWCP_DONOTROUND = 1;
 enum TIMERR_NOERROR = 0;
 
 @foreign("winmm") extern(Windows) u32 timeBeginPeriod(u32);
+
+// d3d11
+struct ID3D11Device {
+  struct VTable {
+    IUnknown.VTable iunknown_vtable;
+    alias this = iunknown_vtable;
+    // ...
+  }
+  mixin COMClass;
+}
+struct ID3D11DeviceChild {
+  struct VTable {
+    IUnknown.VTable iunknown_vtable;
+    alias this = iunknown_vtable;
+    void function(void*) GetDevice;
+    void function(void*) GetPrivateData;
+    void function(void*) SetPrivateData;
+    void function(void*) SetPrivateDataInterface;
+  }
+  mixin COMClass;
+}
+struct ID3D11DeviceContext {
+  struct VTable {
+    ID3D11DeviceChild.VTable id3d11devicechild_vtable;
+    alias this = id3d11devicechild_vtable;
+    void function(void*) VSSetConstantBuffers;
+    void function(void*) PSSetShaderResources;
+    void function(void*) PSSetShader;
+    void function(void*) PSSetSamplers;
+    void function(void*) VSSetShader;
+    void function(void*) DrawIndexed;
+    void function(void*) Draw;
+    void function(void*) Map;
+    void function(void*) Unmap;
+    void function(void*) PSSetConstantBuffers;
+    void function(void*) IASetInputLayout;
+    void function(void*) IASetVertexBuffers;
+    void function(void*) IASetIndexBuffer;
+    void function(void*) DrawIndexedInstanced;
+    void function(void*) DrawInstanced;
+    void function(void*) GSSetConstantBuffers;
+    void function(void*) GSSetShader;
+    void function(void*) IASetPrimitiveTopology;
+    void function(void*) VSSetShaderResources;
+    void function(void*) VSSetSamplers;
+    void function(void*) Begin;
+    void function(void*) End;
+    void function(void*) GetData;
+    void function(void*) SetPredication;
+    void function(void*) GSSetShaderResources;
+    void function(void*) GSSetSamplers;
+    void function(void*) OMSetRenderTargets;
+    void function(void*) OMSetRenderTargetsAndUnorderedAccessViews;
+    void function(void*) OMSetBlendState;
+    void function(void*) OMSetDepthStencilState;
+    void function(void*) SOSetTargets;
+    void function(void*) DrawAuto;
+    void function(void*) DrawIndexedInstancedIndirect;
+    void function(void*) DrawInstancedIndirect;
+    void function(void*) Dispatch;
+    void function(void*) DispatchIndirect;
+    void function(void*) RSSetState;
+    void function(void*) RSSetViewports;
+    void function(void*) RSSetScissorRects;
+    void function(void*) CopySubresourceRegion;
+    void function(void*) CopyResource;
+    void function(void*) UpdateSubresource;
+    void function(void*) CopyStructureCount;
+    void function(void*) ClearRenderTargetView;
+    void function(void*) ClearUnorderedAccessViewUint;
+    void function(void*) ClearUnorderedAccessViewFloat;
+    void function(void*) ClearDepthStencilView;
+    void function(void*) GenerateMips;
+    void function(void*) SetResourceMinLOD;
+    void function(void*) GetResourceMinLOD;
+    void function(void*) ResolveSubresource;
+    void function(void*) ExecuteCommandList;
+    void function(void*) HSSetShaderResources;
+    void function(void*) HSSetShader;
+    void function(void*) HSSetSamplers;
+    void function(void*) HSSetConstantBuffers;
+    void function(void*) DSSetShaderResources;
+    void function(void*) DSSetShader;
+    void function(void*) DSSetSamplers;
+    void function(void*) DSSetConstantBuffers;
+    void function(void*) CSSetShaderResources;
+    void function(void*) CSSetUnorderedAccessViews;
+    void function(void*) CSSetShader;
+    void function(void*) CSSetSamplers;
+    void function(void*) CSSetConstantBuffers;
+    void function(void*) VSGetConstantBuffers;
+    void function(void*) PSGetShaderResources;
+    void function(void*) PSGetShader;
+    void function(void*) PSGetSamplers;
+    void function(void*) VSGetShader;
+    void function(void*) PSGetConstantBuffers;
+    void function(void*) IAGetInputLayout;
+    void function(void*) IAGetVertexBuffers;
+    void function(void*) IAGetIndexBuffer;
+    void function(void*) GSGetConstantBuffers;
+    void function(void*) GSGetShader;
+    void function(void*) IAGetPrimitiveTopology;
+    void function(void*) VSGetShaderResources;
+    void function(void*) VSGetSamplers;
+    void function(void*) GetPredication;
+    void function(void*) GSGetShaderResources;
+    void function(void*) GSGetSamplers;
+    void function(void*) OMGetRenderTargets;
+    void function(void*) OMGetRenderTargetsAndUnorderedAccessViews;
+    void function(void*) OMGetBlendState;
+    void function(void*) OMGetDepthStencilState;
+    void function(void*) SOGetTargets;
+    void function(void*) RSGetState;
+    void function(void*) RSGetViewports;
+    void function(void*) RSGetScissorRects;
+    void function(void*) HSGetShaderResources;
+    void function(void*) HSGetShader;
+    void function(void*) HSGetSamplers;
+    void function(void*) HSGetConstantBuffers;
+    void function(void*) DSGetShaderResources;
+    void function(void*) DSGetShader;
+    void function(void*) DSGetSamplers;
+    void function(void*) DSGetConstantBuffers;
+    void function(void*) CSGetShaderResources;
+    void function(void*) CSGetUnorderedAccessViews;
+    void function(void*) CSGetShader;
+    void function(void*) CSGetSamplers;
+    void function(void*) CSGetConstantBuffers;
+    void function(void*) ClearState;
+    void function(void*) Flush;
+    void function(void*) GetType;
+    void function(void*) GetContextFlags;
+    void function(void*) FinishCommandList;
+  }
+  mixin COMClass;
+}
+
+// dxgi
+struct IDXGIObject {
+  struct VTable {
+    IUnknown.VTable iunknown_vtable;
+    alias this = iunknown_vtable;
+    HRESULT function(void*, GUID*, u32, const(void)*) SetPrivateData;
+    HRESULT function(void*, GUID*, const(IUnknown)*) SetPrivateDataInterface;
+    HRESULT function(void*, GUID*, u32*, void*) GetPrivateData;
+    HRESULT function(void*, IID*, void**) GetParent;
+  }
+  mixin COMClass;
+}
+struct IDXGIDeviceSubObject {
+  struct VTable {
+    IDXGIObject.VTable idxgiobject_vtable;
+    alias this = idxgiobject_vtable;
+    HRESULT function(void*, IID*, void**) GetDevice;
+  }
+  mixin COMClass;
+}
+struct IDXGISwapChain {
+  struct VTable {
+    IDXGIDeviceSubObject.VTable idxgidevicesubobject_vtable;
+    alias this = idxgidevicesubobject_vtable;
+    void function(void*) Present;
+    void function(void*) GetBuffer;
+    void function(void*) SetFullscreenState;
+    void function(void*) GetFullscreenState;
+    void function(void*) GetDesc;
+    void function(void*) ResizeBuffers;
+    void function(void*) ResizeTarget;
+    void function(void*) GetContainingOutput;
+    void function(void*) GetFrameStatistics;
+    void function(void*) GetLastPresentCount;
+  }
+  mixin COMClass;
+}

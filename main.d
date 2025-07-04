@@ -2,11 +2,13 @@ import basic;
 
 version (Windows) {
   import basic.windows;
+  import renderer;
 
   __gshared HINSTANCE platform_hinstance;
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
   __gshared u16[2] platform_size;
+  __gshared auto platform_renderer = &d3d11_renderer;
   debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
@@ -73,6 +75,7 @@ version (Windows) {
           return 0;
         case WM_SIZE:
           platform_size = [cast(u16) lParam, cast(u16) (lParam >> 16)];
+          platform_renderer.resize();
           return 0;
         case WM_CREATE:
           platform_hwnd = hwnd;
@@ -82,8 +85,11 @@ version (Windows) {
           DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, dark_mode.sizeof);
           s32 round_mode = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
+
+          platform_renderer.init_();
           return 0;
         case WM_DESTROY:
+          platform_renderer.deinit();
           PostQuitMessage(0);
           return 0;
         case WM_SYSCOMMAND:
@@ -132,6 +138,8 @@ version (Windows) {
             DispatchMessageW(&msg);
         }
       }
+
+      platform_renderer.present();
 
       if (sleep_is_granular) {
         Sleep(1);
