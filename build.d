@@ -10,7 +10,7 @@ void main() {
   version(Windows) string target = environment.get("TARGET", "windows");
   else             string target = environment.get("TARGET", "macos");
   switch (target) {
-    case "windows": (compiler~" -of=.build/OutbreakProtocol.exe -target=amd64-windows -betterC -debug -g -i main.d").split.spawnProcess.wait; break;
+    case "windows": (compiler~" -of=.build/OutbreakProtocol.exe -target="~(compiler == "dmd" ? "x64" : "amd64")~"-windows -betterC -debug -g -i main.d -L-incremental:no").split.spawnProcess.wait; break;
     case "macos": (compiler~" -of=.build/OutbreakProtocol -target=arm64-macos -betterC -debug -g -i main.d").split.spawnProcess.wait; break;
     case "wasm":
       (compiler~" -of=.build/OutbreakProtocol.wasm -target=wasm32 -betterC -debug -g -i main.d").split.spawnProcess.wait;

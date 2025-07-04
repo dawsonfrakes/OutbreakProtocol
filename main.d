@@ -151,12 +151,25 @@ version (Windows) {
     ExitProcess(0);
   }
 
+  extern(C) int _fltused;
+
   pragma(linkerDirective, "-subsystem:windows");
   pragma(lib, "kernel32");
   pragma(lib, "user32");
   pragma(lib, "ws2_32");
   pragma(lib, "dwmapi");
   pragma(lib, "winmm");
+  pragma(lib, "d3d11");
+  // pragma(lib, "dxgi");
+  pragma(lib, "d3dcompiler");
+
+  version (D_BetterC) {
+    extern(C) float* _memsetFloat(float* p, float value, size_t count) {
+      float *start = p;
+      for (float* end = &p[count]; p < end; p++) *p = value;
+      return start;
+    }
+  }
 }
 
 version (OSX) {
