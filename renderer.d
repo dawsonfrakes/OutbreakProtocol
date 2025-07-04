@@ -332,19 +332,98 @@ version (OpenGL) {
     u32 main_fbo;
     u32 main_fbo_color0;
     u32 main_fbo_depth;
+
+    u32 triangle_shader;
+    u32 triangle_vao;
   }
 
   __gshared OpenGL_Data opengl;
 
+  extern(System) void opengl_debug_proc(u32 source, u32 type, u32 id, u32 severity, u32 length, const(char)* message, const(void)* param) {
+    import main : platform_log, platform_error;
+    auto log = type == GL_DEBUG_TYPE_ERROR ? &platform_error : &platform_log;
+    log(message[0..length]);
+  }
+
   void opengl_init() {
     static if (__traits(compiles, opengl_platform_init))
       opengl_platform_init();
+
+    debug {
+      glEnable(GL_DEBUG_OUTPUT);
+      glDebugMessageCallback(&opengl_debug_proc, null);
+    }
 
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 
     glCreateFramebuffers(1, &opengl.main_fbo);
     glCreateRenderbuffers(1, &opengl.main_fbo_color0);
     glCreateRenderbuffers(1, &opengl.main_fbo_depth);
+
+    u32 triangle_vbo = void;
+    glCreateBuffers(1, &triangle_vbo);
+    glNamedBufferData(triangle_vbo, triangle_vertices.length * triangle_vertices[0].sizeof, triangle_vertices.ptr, GL_STATIC_DRAW);
+
+    u32 triangle_ebo = void;
+    glCreateBuffers(1, &triangle_ebo);
+    glNamedBufferData(triangle_ebo, triangle_elements.length * triangle_elements[0].sizeof, triangle_elements.ptr, GL_STATIC_DRAW);
+
+    u32 vbo_binding = 0;
+    glCreateVertexArrays(1, &opengl.triangle_vao);
+    glVertexArrayElementBuffer(opengl.triangle_vao, triangle_ebo);
+    glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, triangle_vbo, 0, TriangleVertex.sizeof);
+
+    u32 position_attrib = 0;
+    glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.triangle_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, TriangleVertex.position.offsetof);
+
+    u32 color_attrib = 1;
+    glEnableVertexArrayAttrib(opengl.triangle_vao, color_attrib);
+    glVertexArrayAttribBinding(opengl.triangle_vao, color_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, TriangleVertex.color.offsetof);
+
+    string vsrc =
+    `#version 450
+
+    layout(location = 0) in vec3 a_position;
+    layout(location = 1) in vec4 a_color;
+
+    layout(location = 1) out vec4 f_color;
+
+    void main() {
+      gl_Position = vec4(a_position, 1.0);
+      f_color = a_color;
+    }`;
+    const(char)*[1] vsrcs = [vsrc.ptr];
+    u32 vshader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vshader, cast(u32) vsrcs.length, vsrcs.ptr, null);
+    glCompileShader(vshader);
+
+    string fsrc =
+    `#version 450
+
+    layout(location = 1) in vec4 f_color;
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+      color = f_color;
+    }`;
+    const(char)*[1] fsrcs = [fsrc.ptr];
+    u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fshader, cast(u32) fsrcs.length, fsrcs.ptr, null);
+    glCompileShader(fshader);
+
+    opengl.triangle_shader = glCreateProgram();
+    glAttachShader(opengl.triangle_shader, vshader);
+    glAttachShader(opengl.triangle_shader, fshader);
+    glLinkProgram(opengl.triangle_shader);
+    glDetachShader(opengl.triangle_shader, fshader);
+    glDetachShader(opengl.triangle_shader, vshader);
+
+    glDeleteShader(fshader);
+    glDeleteShader(vshader);
   }
 
   void opengl_deinit() {
@@ -358,6 +437,8 @@ version (OpenGL) {
       opengl_platform_resize();
 
     if (platform_size[0] == 0 || platform_size[1] == 0) return;
+
+    glViewport(0, 0, platform_size[0], platform_size[1]);
 
     s32 fbo_color_samples_max = void;
     glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &fbo_color_samples_max);
@@ -379,6 +460,11 @@ version (OpenGL) {
     glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
 
     glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
+    glFrontFace(GL_CW);
+    glEnable(GL_CULL_FACE);
+    glUseProgram(opengl.triangle_shader);
+    glBindVertexArray(opengl.triangle_vao);
+    glDrawElements(GL_TRIANGLES, cast(u32) triangle_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glClear(0); // NOTE(dfra): this fixes intel default framebuffer bug.

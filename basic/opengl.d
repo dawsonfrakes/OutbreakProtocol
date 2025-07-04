@@ -14,6 +14,7 @@ enum GL_GREATER = 0x0204;
 enum GL_SRC_ALPHA = 0x0302;
 enum GL_ONE_MINUS_SRC_ALPHA = 0x0303;
 enum GL_FRONT_AND_BACK = 0x0408;
+enum GL_CW = 0x0900;
 enum GL_CULL_FACE = 0x0B44;
 enum GL_DEPTH_TEST = 0x0B71;
 enum GL_BLEND = 0x0BE2;
@@ -40,9 +41,30 @@ enum GL_LINEAR = 0x2601;
 @gl_version(1, 0) extern(System) void glClear(u32);
 @gl_version(1, 0) extern(System) void glClearColor(f32, f32, f32, f32);
 @gl_version(1, 0) extern(System) void glGetIntegerv(u32, s32*);
+@gl_version(1, 0) extern(System) void glFrontFace(u32);
+@gl_version(1, 0) extern(System) void glViewport(s32, s32, u32, u32);
+
+// 1.1
+@gl_version(1, 1) extern(System) void glDrawElements(u32, u32, u32, const(void)*);
+
+// 1.5
+enum GL_STATIC_DRAW = 0x88E4;
+enum GL_DYNAMIC_DRAW = 0x88E8;
 
 // 2.0
+enum GL_FRAGMENT_SHADER = 0x8B30;
+enum GL_VERTEX_SHADER = 0x8B31;
 enum GL_LOWER_LEFT = 0x8CA1;
+
+@gl_version(2, 0) extern(System) u32 glCreateProgram();
+@gl_version(2, 0) extern(System) void glAttachShader(u32, u32);
+@gl_version(2, 0) extern(System) void glDetachShader(u32, u32);
+@gl_version(2, 0) extern(System) void glLinkProgram(u32);
+@gl_version(2, 0) extern(System) void glUseProgram(u32);
+@gl_version(2, 0) extern(System) u32 glCreateShader(u32);
+@gl_version(2, 0) extern(System) void glDeleteShader(u32);
+@gl_version(2, 0) extern(System) void glShaderSource(u32, u32, const(char*)*, const(s32)*);
+@gl_version(2, 0) extern(System) void glCompileShader(u32);
 
 // 3.0
 enum GL_RGBA16F = 0x881A;
@@ -55,10 +77,19 @@ enum GL_RENDERBUFFER = 0x8D41;
 enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 
 @gl_version(3, 0) extern(System) void glBindFramebuffer(u32, u32);
+@gl_version(3, 0) extern(System) void glBindVertexArray(u32);
 
 // 3.2
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
+
+// 4.3
+enum GL_DEBUG_TYPE_ERROR = 0x824C;
+enum GL_DEBUG_OUTPUT = 0x92E0;
+
+alias GLDEBUGPROC = extern(System) void function(u32, u32, u32, u32, u32, const(char)*, const(void)*);
+
+@gl_version(4, 3) void glDebugMessageCallback(GLDEBUGPROC, const(void)*);
 
 // 4.5
 enum GL_ZERO_TO_ONE = 0x935F;
@@ -70,3 +101,11 @@ enum GL_ZERO_TO_ONE = 0x935F;
 @gl_version(4, 5) extern(System) void glBlitNamedFramebuffer(u32, u32, s32, s32, s32, s32, s32, s32, s32, s32, u32, u32);
 @gl_version(4, 5) extern(System) void glCreateRenderbuffers(u32, u32*);
 @gl_version(4, 5) extern(System) void glNamedRenderbufferStorageMultisample(u32, u32, u32, u32, u32);
+@gl_version(4, 5) extern(System) void glCreateVertexArrays(u32, u32*);
+@gl_version(4, 5) extern(System) void glVertexArrayElementBuffer(u32, u32);
+@gl_version(4, 5) extern(System) void glVertexArrayVertexBuffer(u32, u32, u32, ssize, u32);
+@gl_version(4, 5) extern(System) void glEnableVertexArrayAttrib(u32, u32);
+@gl_version(4, 5) extern(System) void glVertexArrayAttribBinding(u32, u32, u32);
+@gl_version(4, 5) extern(System) void glVertexArrayAttribFormat(u32, u32, s32, u32, bool, u32);
+@gl_version(4, 5) extern(System) void glCreateBuffers(u32, u32*);
+@gl_version(4, 5) extern(System) void glNamedBufferData(u32, usize, const(void)*, u32);

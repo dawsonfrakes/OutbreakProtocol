@@ -8,7 +8,7 @@ version (Windows) {
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
   __gshared u16[2] platform_size;
-  __gshared platform_renderer = true ? &d3d11_renderer : &opengl_renderer;
+  __gshared platform_renderer = false ? &d3d11_renderer : &opengl_renderer;
   debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
@@ -42,7 +42,7 @@ version (Windows) {
 
   }
 
-  void platform_log_any(bool error)(string s) {
+  void platform_log_any(bool error)(const(char)[] s) {
     debug {
       string prefix = error ? "ERROR: " : "LOG: ";
       HANDLE file = error ? platform_stderr : platform_stdout;
@@ -51,8 +51,8 @@ version (Windows) {
       WriteFile(file, "\n".ptr, 1, null, null);
     }
   }
-  void platform_log(string s) { platform_log_any!false(s); }
-  void platform_error(string s) { platform_log_any!true(s); }
+  void platform_log(const(char)[] s) { platform_log_any!false(s); }
+  void platform_error(const(char)[] s) { platform_log_any!true(s); }
 
   extern(Windows) noreturn WinMainCRTStartup() {
     platform_hinstance = GetModuleHandleW(null);
