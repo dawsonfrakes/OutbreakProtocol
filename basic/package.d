@@ -8,11 +8,7 @@ alias u8 = ubyte;
 alias u16 = ushort;
 alias u32 = uint;
 alias usize = size_t;
-
-struct f32 {
-  float data = 0.0;
-  alias this = data;
-}
+alias f32 = float;
 
 struct String {
   char[] items;

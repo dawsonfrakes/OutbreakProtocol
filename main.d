@@ -8,12 +8,12 @@ version (Windows) {
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
   __gshared u16[2] platform_size;
-  __gshared auto platform_renderer = &d3d11_renderer;
+  __gshared platform_renderer = true ? &d3d11_renderer : &opengl_renderer;
   debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
 
-  void toggle_fullscreen() {
+  void platform_toggle_fullscreen() {
     __gshared WINDOWPLACEMENT save_placement = {WINDOWPLACEMENT.sizeof};
     ssize style = GetWindowLongPtrW(platform_hwnd, GWL_STYLE);
     if (style & WS_OVERLAPPEDWINDOW) {
@@ -34,13 +34,25 @@ version (Windows) {
     }
   }
 
-  void update_cursor_clip() {
+  void platform_update_cursor_clip() {
     ClipCursor(null);
   }
 
-  void clear_held_keys() {
+  void platform_clear_held_keys() {
 
   }
+
+  void platform_log_any(bool error)(string s) {
+    debug {
+      string prefix = error ? "ERROR: " : "LOG: ";
+      HANDLE file = error ? platform_stderr : platform_stdout;
+      WriteFile(file, prefix.ptr, cast(u32) prefix.length, null, null);
+      WriteFile(file, s.ptr, cast(u32) s.length, null, null);
+      WriteFile(file, "\n".ptr, 1, null, null);
+    }
+  }
+  void platform_log(string s) { platform_log_any!false(s); }
+  void platform_error(string s) { platform_log_any!true(s); }
 
   extern(Windows) noreturn WinMainCRTStartup() {
     platform_hinstance = GetModuleHandleW(null);
@@ -70,8 +82,8 @@ version (Windows) {
           return 1;
         case WM_ACTIVATEAPP:
           bool tabbing_in = wParam != 0;
-          if (tabbing_in) update_cursor_clip();
-          else clear_held_keys();
+          if (tabbing_in) platform_update_cursor_clip();
+          else platform_clear_held_keys();
           return 0;
         case WM_SIZE:
           platform_size = [cast(u16) lParam, cast(u16) (lParam >>> 16)];
@@ -127,8 +139,8 @@ version (Windows) {
               if (pressed) {
                 if (wParam == VK_F4 && alt) DestroyWindow(platform_hwnd);
                 debug if (wParam == VK_ESCAPE) DestroyWindow(platform_hwnd);
-                if (wParam == VK_F11) toggle_fullscreen();
-                if (wParam == VK_RETURN && alt) toggle_fullscreen();
+                if (wParam == VK_F11) platform_toggle_fullscreen();
+                if (wParam == VK_RETURN && alt) platform_toggle_fullscreen();
               }
             }
             break;
@@ -156,11 +168,12 @@ version (Windows) {
   pragma(linkerDirective, "-subsystem:windows");
   pragma(lib, "kernel32");
   pragma(lib, "user32");
+  pragma(lib, "gdi32");
+  pragma(lib, "opengl32");
   pragma(lib, "ws2_32");
   pragma(lib, "dwmapi");
   pragma(lib, "winmm");
   pragma(lib, "d3d11");
-  // pragma(lib, "dxgi");
   pragma(lib, "d3dcompiler");
 
   version (D_BetterC) {

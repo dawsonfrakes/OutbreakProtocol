@@ -33,6 +33,7 @@ alias HMODULE = HINSTANCE;
 @foreign("kernel32") extern(Windows) void Sleep(u32);
 @foreign("kernel32") extern(Windows) s32 AllocConsole();
 @foreign("kernel32") extern(Windows) HANDLE GetStdHandle(u32);
+@foreign("kernel32") extern(Windows) s32 WriteFile(HANDLE, const(void)*, u32, u32*, void*);
 @foreign("kernel32") extern(Windows) noreturn ExitProcess(u32);
 
 // user32
@@ -153,6 +154,60 @@ struct MONITORINFO {
 @foreign("user32") extern(Windows) s32 SetWindowPos(HWND, HWND, s32, s32, s32, s32, u32);
 @foreign("user32") extern(Windows) HMONITOR MonitorFromWindow(HWND, u32);
 @foreign("user32") extern(Windows) s32 GetMonitorInfoW(HMONITOR, MONITORINFO*);
+
+// gdi32
+enum PFD_DOUBLEBUFFER = 0x00000001;
+enum PFD_DRAW_TO_WINDOW = 0x00000004;
+enum PFD_SUPPORT_OPENGL = 0x00000020;
+enum PFD_DEPTH_DONTCARE = 0x20000000;
+
+struct PIXELFORMATDESCRIPTOR {
+  u16 nSize;
+  u16 nVersion;
+  u32 dwFlags;
+  u8 iPixelType;
+  u8 cColorBits;
+  u8 cRedBits;
+  u8 cRedShift;
+  u8 cGreenBits;
+  u8 cGreenShift;
+  u8 cBlueBits;
+  u8 cBlueShift;
+  u8 cAlphaBits;
+  u8 cAlphaShift;
+  u8 cAccumBits;
+  u8 cAccumRedBits;
+  u8 cAccumGreenBits;
+  u8 cAccumBlueBits;
+  u8 cAccumAlphaBits;
+  u8 cDepthBits;
+  u8 cStencilBits;
+  u8 cAuxBuffers;
+  u8 iLayerType;
+  u8 bReserved;
+  u32 dwLayerMask;
+  u32 dwVisibleMask;
+  u32 dwDamageMask;
+}
+
+@foreign("gdi32") extern(Windows) s32 ChoosePixelFormat(HDC, const(PIXELFORMATDESCRIPTOR)*);
+@foreign("gdi32") extern(Windows) s32 SetPixelFormat(HDC, s32, const(PIXELFORMATDESCRIPTOR)*);
+@foreign("gdi32") extern(Windows) s32 SwapBuffers(HDC);
+
+// opengl32
+enum WGL_CONTEXT_MAJOR_VERSION_ARB = 0x2091;
+enum WGL_CONTEXT_MINOR_VERSION_ARB = 0x2092;
+enum WGL_CONTEXT_FLAGS_ARB = 0x2094;
+enum WGL_CONTEXT_PROFILE_MASK_ARB = 0x9126;
+enum WGL_CONTEXT_DEBUG_BIT_ARB = 0x0001;
+enum WGL_CONTEXT_CORE_PROFILE_BIT_ARB = 0x00000001;
+
+struct HGLRC__; alias HGLRC = HGLRC__*;
+
+@foreign("opengl32") extern(Windows) HGLRC wglCreateContext(HDC);
+@foreign("opengl32") extern(Windows) s32 wglDeleteContext(HGLRC);
+@foreign("opengl32") extern(Windows) s32 wglMakeCurrent(HDC, HGLRC);
+@foreign("opengl32") extern(Windows) PROC wglGetProcAddress(const(char)*);
 
 // ws2_32
 enum WSADESCRIPTION_LEN = 256;
