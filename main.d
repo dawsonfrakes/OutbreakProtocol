@@ -158,3 +158,21 @@ version (Windows) {
   pragma(lib, "dwmapi");
   pragma(lib, "winmm");
 }
+
+version (OSX) {
+  import basic.macos;
+
+  __gshared NSApplication* platform_app;
+
+  extern(C) noreturn main() {
+    NSApplicationLoad();
+    init_objc_classes_and_selectors();
+
+    platform_app = NSApplication.sharedApplication();
+    platform_app.setActivationPolicy(NSApplication.ActivationPolicy.REGULAR);
+
+    _exit(0);
+  }
+
+  pragma(linkerDirective, "-framework", "AppKit");
+}
