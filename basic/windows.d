@@ -348,6 +348,51 @@ struct D3D11_RENDER_TARGET_VIEW_DESC {
     D3D11_TEX3D_RTV Texture3D;
   }
 }
+enum D3D11_DSV_DIMENSION : s32 {
+  UNKNOWN = 0,
+  TEXTURE1D = 1,
+  TEXTURE1DARRAY = 2,
+  TEXTURE2D = 3,
+  TEXTURE2DARRAY = 4,
+  TEXTURE2DMS = 5,
+  TEXTURE2DMSARRAY = 6,
+}
+struct D3D11_TEX1D_DSV {
+  u32 MipSlice;
+}
+struct D3D11_TEX1D_ARRAY_DSV {
+  u32 MipSlice;
+  u32 FirstArraySlice;
+  u32 ArraySize;
+}
+struct D3D11_TEX2D_DSV {
+  u32 MipSlice;
+}
+struct D3D11_TEX2D_ARRAY_DSV {
+  u32 MipSlice;
+  u32 FirstArraySlice;
+  u32 ArraySize;
+}
+struct D3D11_TEX2DMS_DSV {
+  u32 UnusedField_NothingToDefine;
+}
+struct D3D11_TEX2DMS_ARRAY_DSV {
+  u32 FirstArraySlice;
+  u32 ArraySize;
+}
+struct D3D11_DEPTH_STENCIL_VIEW_DESC {
+  DXGI_FORMAT Format;
+  D3D11_DSV_DIMENSION ViewDimension;
+  u32 Flags;
+  union {
+    D3D11_TEX1D_DSV Texture1D;
+    D3D11_TEX1D_ARRAY_DSV Texture1DArray;
+    D3D11_TEX2D_DSV Texture2D;
+    D3D11_TEX2D_ARRAY_DSV Texture2DArray;
+    D3D11_TEX2DMS_DSV Texture2DMS;
+    D3D11_TEX2DMS_ARRAY_DSV Texture2DMSArray;
+  }
+}
 enum D3D11_RESOURCE_DIMENSION : s32 {
   UNKNOWN = 0,
   BUFFER = 1,
@@ -451,6 +496,62 @@ struct D3D11_BUFFER_DESC {
   u32 MiscFlags;
   u32 StructureByteStride;
 }
+struct D3D11_TEXTURE2D_DESC {
+  u32 Width;
+  u32 Height;
+  u32 MipLevels;
+  u32 ArraySize;
+  DXGI_FORMAT Format;
+  DXGI_SAMPLE_DESC SampleDesc;
+  D3D11_USAGE Usage;
+  u32 BindFlags;
+  u32 CPUAccessFlags;
+  u32 MiscFlags;
+}
+enum D3D11_CLEAR_FLAG : u32 { // @EnumFlags
+  DEPTH = 0x1,
+  STENCIL = 0x2,
+}
+enum D3D11_DEPTH_WRITE_MASK : s32 {
+  ZERO = 0,
+  ALL = 1,
+}
+enum D3D11_COMPARISON_FUNC : s32 {
+  NEVER = 1,
+  LESS = 2,
+  EQUAL = 3,
+  LESS_EQUAL = 4,
+  GREATER = 5,
+  NOT_EQUAL = 6,
+  GREATER_EQUAL = 7,
+  ALWAYS = 8,
+}
+enum D3D11_STENCIL_OP : s32 {
+  KEEP = 1,
+  ZERO = 2,
+  REPLACE = 3,
+  INCR_SAT = 4,
+  DECR_SAT = 5,
+  INVERT = 6,
+  INCR = 7,
+  DECR = 8
+}
+struct D3D11_DEPTH_STENCILOP_DESC {
+  D3D11_STENCIL_OP StencilFailOp;
+  D3D11_STENCIL_OP StencilDepthFailOp;
+  D3D11_STENCIL_OP StencilPassOp;
+  D3D11_COMPARISON_FUNC StencilFunc;
+}
+struct D3D11_DEPTH_STENCIL_DESC {
+  s32 DepthEnable;
+  D3D11_DEPTH_WRITE_MASK DepthWriteMask;
+  D3D11_COMPARISON_FUNC DepthFunc;
+  s32 StencilEnable;
+  u8 StencilReadMask;
+  u8 StencilWriteMask;
+  D3D11_DEPTH_STENCILOP_DESC FrontFace;
+  D3D11_DEPTH_STENCILOP_DESC BackFace;
+}
 struct ID3DBlob {
   struct VTable {
     IUnknown.VTable iunknown_vtable;
@@ -466,12 +567,12 @@ struct ID3D11Device {
     alias this = iunknown_vtable;
     extern(Windows) HRESULT function(void*, const(D3D11_BUFFER_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Buffer**) CreateBuffer;
     extern(Windows) void function(void*) CreateTexture1D;
-    extern(Windows) void function(void*) CreateTexture2D;
+    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE2D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture2D**) CreateTexture2D;
     extern(Windows) void function(void*) CreateTexture3D;
     extern(Windows) void function(void*) CreateShaderResourceView;
     extern(Windows) void function(void*) CreateUnorderedAccessView;
     extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_RENDER_TARGET_VIEW_DESC)*, ID3D11RenderTargetView**) CreateRenderTargetView;
-    extern(Windows) void function(void*) CreateDepthStencilView;
+    extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_DEPTH_STENCIL_VIEW_DESC)*, ID3D11DepthStencilView**) CreateDepthStencilView;
     extern(Windows) HRESULT function(void*, const(D3D11_INPUT_ELEMENT_DESC)*, u32, const(void)*, usize, ID3D11InputLayout**) CreateInputLayout;
     extern(Windows) HRESULT function(void*, const(void)*, usize, ID3D11ClassLinkage*, ID3D11VertexShader**) CreateVertexShader;
     extern(Windows) void function(void*) CreateGeometryShader;
@@ -482,7 +583,7 @@ struct ID3D11Device {
     extern(Windows) void function(void*) CreateComputeShader;
     extern(Windows) void function(void*) CreateClassLinkage;
     extern(Windows) void function(void*) CreateBlendState;
-    extern(Windows) void function(void*) CreateDepthStencilState;
+    extern(Windows) HRESULT function(void*, const(D3D11_DEPTH_STENCIL_DESC)*, ID3D11DepthStencilState**) CreateDepthStencilState;
     extern(Windows) void function(void*) CreateRasterizerState;
     extern(Windows) void function(void*) CreateSamplerState;
     extern(Windows) void function(void*) CreateQuery;
@@ -538,6 +639,14 @@ struct ID3D11Buffer {
 }
 struct ID3D11Texture2D {
   __gshared immutable uuidof = IID(0x6F15AAF2, 0xD208, 0x4E89, [0x9A, 0xB4, 0x48, 0x95, 0x35, 0xD3, 0x4F, 0x9C]);
+  struct VTable {
+    ID3D11Resource.VTable id3d11resource_vtable;
+    alias this = id3d11resource_vtable;
+    extern(Windows) void function(void*) GetDesc;
+  }
+  mixin COMClass;
+}
+struct ID3D11DepthStencilState {
   struct VTable {
     ID3D11Resource.VTable id3d11resource_vtable;
     alias this = id3d11resource_vtable;
@@ -639,7 +748,7 @@ struct ID3D11DeviceContext {
     extern(Windows) void function(void*, u32, const(ID3D11RenderTargetView*)*, ID3D11DepthStencilView*) OMSetRenderTargets;
     extern(Windows) void function(void*) OMSetRenderTargetsAndUnorderedAccessViews;
     extern(Windows) void function(void*) OMSetBlendState;
-    extern(Windows) void function(void*) OMSetDepthStencilState;
+    extern(Windows) void function(void*, ID3D11DepthStencilState*, u32) OMSetDepthStencilState;
     extern(Windows) void function(void*) SOSetTargets;
     extern(Windows) void function(void*) DrawAuto;
     extern(Windows) void function(void*) DrawIndexedInstancedIndirect;
@@ -656,7 +765,7 @@ struct ID3D11DeviceContext {
     extern(Windows) void function(void*, ID3D11RenderTargetView*, const(float)*) ClearRenderTargetView;
     extern(Windows) void function(void*) ClearUnorderedAccessViewUint;
     extern(Windows) void function(void*) ClearUnorderedAccessViewFloat;
-    extern(Windows) void function(void*) ClearDepthStencilView;
+    extern(Windows) void function(void*, ID3D11DepthStencilView*, u32, f32, u8) ClearDepthStencilView;
     extern(Windows) void function(void*) GenerateMips;
     extern(Windows) void function(void*) SetResourceMinLOD;
     extern(Windows) void function(void*) GetResourceMinLOD;

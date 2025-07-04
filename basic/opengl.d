@@ -11,6 +11,7 @@ import basic;
 enum GL_COLOR_BUFFER_BIT = 0x00004000;
 enum GL_TRIANGLES = 0x0004;
 enum GL_GREATER = 0x0204;
+enum GL_GEQUAL = 0x0206;
 enum GL_SRC_ALPHA = 0x0302;
 enum GL_ONE_MINUS_SRC_ALPHA = 0x0303;
 enum GL_FRONT_AND_BACK = 0x0408;
@@ -42,6 +43,7 @@ enum GL_LINEAR = 0x2601;
 @gl_version(1, 0) extern(System) void glClearColor(f32, f32, f32, f32);
 @gl_version(1, 0) extern(System) void glGetIntegerv(u32, s32*);
 @gl_version(1, 0) extern(System) void glFrontFace(u32);
+@gl_version(1, 0) extern(System) void glDepthFunc(u32);
 @gl_version(1, 0) extern(System) void glViewport(s32, s32, u32, u32);
 
 // 1.1

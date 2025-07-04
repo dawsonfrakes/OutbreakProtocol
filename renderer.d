@@ -1,6 +1,6 @@
 import basic;
-
-import basic.maths;
+import basic.maths : min, max;
+static import game;
 
 version (Windows) {
   version = D3D11;
@@ -11,7 +11,7 @@ struct Platform_Renderer {
   void function() init_;
   void function() deinit;
   void function() resize;
-  void function() present;
+  void function(game.Renderer*) present;
 }
 
 struct TriangleVertex {
@@ -31,7 +31,7 @@ __gshared immutable null_renderer = Platform_Renderer(
   {},
   {},
   {},
-  {},
+  (renderer) {},
 );
 
 version (D3D11) {
@@ -45,6 +45,10 @@ version (D3D11) {
     ID3D11DeviceContext* ctx;
 
     ID3D11RenderTargetView* backbuffer_view;
+
+    ID3D11Texture2D* depthbuffer;
+    ID3D11DepthStencilView* depthbuffer_view;
+    ID3D11DepthStencilState* depthstate;
 
     ID3D11VertexShader* triangle_vshader;
     ID3D11PixelShader* triangle_pshader;
@@ -160,6 +164,13 @@ version (D3D11) {
       hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
       if (hr < 0) goto error;
 
+      D3D11_DEPTH_STENCIL_DESC depthstate_desc;
+      depthstate_desc.DepthEnable = true;
+      depthstate_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK.ALL;
+      depthstate_desc.DepthFunc = D3D11_COMPARISON_FUNC.GREATER_EQUAL;
+      hr = d3d11.device.CreateDepthStencilState(&depthstate_desc, &d3d11.depthstate);
+      if (hr < 0) goto error;
+
       d3d11.initted = true;
       return;
     }
@@ -168,6 +179,10 @@ version (D3D11) {
   }
 
   void d3d11_deinit() {
+    if (d3d11.depthstate) d3d11.depthstate.Release();
+    if (d3d11.depthbuffer_view) d3d11.depthbuffer_view.Release();
+    if (d3d11.depthbuffer) d3d11.depthbuffer.Release();
+
     if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
     if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
     if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
@@ -187,6 +202,8 @@ version (D3D11) {
     {
       HRESULT hr = void;
 
+      if (d3d11.depthbuffer_view) d3d11.depthbuffer_view.Release();
+      if (d3d11.depthbuffer) d3d11.depthbuffer.Release();
       if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
 
       hr = d3d11.swapchain.ResizeBuffers(1, platform_size[0], platform_size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
@@ -200,22 +217,38 @@ version (D3D11) {
       hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) backbuffer, null, &d3d11.backbuffer_view);
       if (hr < 0) goto error;
 
+      D3D11_TEXTURE2D_DESC depthbuffer_desc;
+      depthbuffer_desc.Width = platform_size[0];
+      depthbuffer_desc.Height = platform_size[1];
+      depthbuffer_desc.MipLevels = 0;
+      depthbuffer_desc.ArraySize = 1;
+      depthbuffer_desc.Format = DXGI_FORMAT.D32_FLOAT;
+      depthbuffer_desc.SampleDesc.Count = 1;
+      depthbuffer_desc.Usage = D3D11_USAGE.DEFAULT;
+      depthbuffer_desc.BindFlags = D3D11_BIND_FLAG.DEPTH_STENCIL;
+      hr = d3d11.device.CreateTexture2D(&depthbuffer_desc, null, &d3d11.depthbuffer);
+      if (hr < 0) goto error;
+
+      hr = d3d11.device.CreateDepthStencilView(cast(ID3D11Resource*) d3d11.depthbuffer, null, &d3d11.depthbuffer_view);
+      if (hr < 0) goto error;
+
       return;
     }
   error:
     d3d11_deinit();
   }
 
-  void d3d11_present() {
+  void d3d11_present(game.Renderer* game_renderer) {
     if (!d3d11.initted) return;
-    float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
-    d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
+    d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
+    d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
 
     d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
     d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
     d3d11.ctx.IASetInputLayout(d3d11.triangle_input_layout);
     d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
-    d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, null);
+    d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
+    d3d11.ctx.OMSetDepthStencilState(d3d11.depthstate, 0);
     u32 stride = TriangleVertex.sizeof;
     u32 offset = 0;
     d3d11.ctx.IASetVertexBuffers(0, 1, &d3d11.triangle_vbo, &stride, &offset);
@@ -453,19 +486,25 @@ version (OpenGL) {
     glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, opengl.main_fbo_depth);
   }
 
-  void opengl_present() {
-    float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
-    glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, clear_color0.ptr);
-    float clear_depth = 0.0;
-    glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
+  void opengl_present(game.Renderer* game_renderer) {
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
+    glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &game_renderer.clear_depth);
 
     glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
     glFrontFace(GL_CW);
     glEnable(GL_CULL_FACE);
+    glDepthFunc(GL_GEQUAL);
+    glEnable(GL_DEPTH_TEST);
     glUseProgram(opengl.triangle_shader);
     glBindVertexArray(opengl.triangle_vao);
     glDrawElements(GL_TRIANGLES, cast(u32) triangle_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    debug {
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_CULL_FACE);
+      glBindVertexArray(0);
+      glUseProgram(0);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
     glClear(0); // NOTE(dfra): this fixes intel default framebuffer bug.
 

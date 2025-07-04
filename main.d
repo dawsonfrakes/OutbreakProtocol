@@ -1,4 +1,5 @@
 import basic;
+static import game;
 
 version (Windows) {
   import basic.windows;
@@ -8,7 +9,7 @@ version (Windows) {
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
   __gshared u16[2] platform_size;
-  __gshared platform_renderer = false ? &d3d11_renderer : &opengl_renderer;
+  __gshared platform_renderer = true ? &d3d11_renderer : &opengl_renderer;
   debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
   debug __gshared HANDLE platform_stderr;
@@ -151,7 +152,9 @@ version (Windows) {
         }
       }
 
-      platform_renderer.present();
+      game.Renderer game_renderer;
+      game.game_update_and_render(&game_renderer);
+      platform_renderer.present(&game_renderer);
 
       if (sleep_is_granular) {
         Sleep(1);
