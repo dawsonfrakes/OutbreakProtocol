@@ -14,13 +14,16 @@ struct Platform_Renderer {
 
 align(16) struct TriangleVertex {
   float[3] position;
+  float[4] color;
 }
 
 __gshared immutable triangle_vertices = [
-  TriangleVertex([+0.5, -0.5, 0.0]),
-  TriangleVertex([-0.5, -0.5, 0.0]),
-  TriangleVertex([+0.0, +0.5, 0.0]),
+  TriangleVertex([+0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
+  TriangleVertex([-0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
+  TriangleVertex([-0.5, +0.5, 0.0], [0.0, 0.0, 1.0, 1.0]),
+  TriangleVertex([+0.5, +0.5, 0.0], [1.0, 0.0, 1.0, 1.0]),
 ];
+__gshared immutable u16[6] triangle_elements = [0, 1, 2, 2, 3, 0];
 
 version (D3D11) {
   import basic.windows;
@@ -38,6 +41,7 @@ version (D3D11) {
     ID3D11PixelShader* triangle_pshader;
     ID3D11InputLayout* triangle_input_layout;
     ID3D11Buffer* triangle_vbo;
+    ID3D11Buffer* triangle_ebo;
   }
 
   __gshared D3D11_Data d3d11;
@@ -76,12 +80,24 @@ version (D3D11) {
       }
 
       string source = `
-      float4 vmain(float3 a_position : Position) : SV_Position {
-        return float4(a_position, 1.0f);
+      struct VInput {
+        float3 position : Position;
+        float4 color : Color;
+      };
+      struct VOutput {
+        float4 position : SV_Position;
+        float4 color : Color;
+      };
+
+      VOutput vmain(VInput input) {
+        VOutput output;
+        output.position = float4(input.position, 1.0f);
+        output.color = input.color;
+        return output;
       }
 
-      float4 pmain() : SV_Target0 {
-        return float4(1.0f, 1.0f, 1.0f, 1.0f);
+      float4 pmain(VOutput input) : SV_Target0 {
+        return input.color;
       }
       `;
 
@@ -101,12 +117,17 @@ version (D3D11) {
       hr = d3d11.device.CreatePixelShader(pblob.GetBufferPointer(), pblob.GetBufferSize(), null, &d3d11.triangle_pshader);
       if (hr < 0) goto error;
 
-      D3D11_INPUT_ELEMENT_DESC[1] input_descs;
+      D3D11_INPUT_ELEMENT_DESC[2] input_descs;
       input_descs[0].SemanticName = "Position";
       input_descs[0].SemanticIndex = 0;
       input_descs[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
       input_descs[0].AlignedByteOffset = TriangleVertex.position.offsetof;
       input_descs[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+      input_descs[1].SemanticName = "Color";
+      input_descs[1].SemanticIndex = 0;
+      input_descs[1].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
+      input_descs[1].AlignedByteOffset = TriangleVertex.color.offsetof;
+      input_descs[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
       hr = d3d11.device.CreateInputLayout(input_descs.ptr, cast(u32) input_descs.length, vblob.GetBufferPointer(), vblob.GetBufferSize(), &d3d11.triangle_input_layout);
       if (hr < 0) goto error;
 
@@ -120,6 +141,16 @@ version (D3D11) {
       hr = d3d11.device.CreateBuffer(&triangle_vbo_desc, &triangle_vbo_data, &d3d11.triangle_vbo);
       if (hr < 0) goto error;
 
+      D3D11_BUFFER_DESC triangle_ebo_desc;
+      triangle_ebo_desc.ByteWidth = cast(u32) triangle_elements.length * cast(u32) triangle_elements[0].sizeof;
+      triangle_ebo_desc.Usage = D3D11_USAGE.DEFAULT;
+      triangle_ebo_desc.BindFlags = D3D11_BIND_FLAG.INDEX_BUFFER;
+      triangle_ebo_desc.StructureByteStride = triangle_elements[0].sizeof;
+      D3D11_SUBRESOURCE_DATA triangle_ebo_data;
+      triangle_ebo_data.pSysMem = triangle_elements.ptr;
+      hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
+      if (hr < 0) goto error;
+
       d3d11.initted = true;
       return;
     }
@@ -128,6 +159,7 @@ version (D3D11) {
   }
 
   void d3d11_deinit() {
+    if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
     if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
     if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
     if (d3d11.triangle_pshader) d3d11.triangle_pshader.Release();
@@ -142,11 +174,14 @@ version (D3D11) {
   }
 
   void d3d11_resize() {
-    if (!d3d11.initted) return;
+    if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
     {
       HRESULT hr = void;
 
       if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
+
+      hr = d3d11.swapchain.ResizeBuffers(1, platform_size[0], platform_size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
+      if (hr < 0) goto error;
 
       ID3D11Texture2D* backbuffer = void;
       hr = d3d11.swapchain.GetBuffer(0, &backbuffer.uuidof, cast(void**) &backbuffer);
@@ -167,11 +202,6 @@ version (D3D11) {
     float[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, clear_color0.ptr);
 
-    D3D11_VIEWPORT viewport;
-    viewport.Width = platform_size[0];
-    viewport.Height = platform_size[1];
-    viewport.MaxDepth = 1.0;
-    d3d11.ctx.RSSetViewports(1, &viewport);
     d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
     d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
     d3d11.ctx.IASetInputLayout(d3d11.triangle_input_layout);
@@ -180,7 +210,13 @@ version (D3D11) {
     u32 stride = TriangleVertex.sizeof;
     u32 offset = 0;
     d3d11.ctx.IASetVertexBuffers(0, 1, &d3d11.triangle_vbo, &stride, &offset);
-    d3d11.ctx.Draw(3, 0);
+    d3d11.ctx.IASetIndexBuffer(d3d11.triangle_ebo, DXGI_FORMAT.R16_UINT, 0);
+    D3D11_VIEWPORT viewport;
+    viewport.Width = platform_size[0];
+    viewport.Height = platform_size[1];
+    viewport.MaxDepth = 1.0;
+    d3d11.ctx.RSSetViewports(1, &viewport);
+    d3d11.ctx.DrawIndexed(cast(u32) triangle_elements.length, 0, 0);
 
     d3d11.swapchain.Present(1, 0);
   }

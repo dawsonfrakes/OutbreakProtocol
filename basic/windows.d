@@ -560,14 +560,14 @@ struct ID3D11DeviceContext {
     extern(Windows) void function(void*, ID3D11PixelShader*, const(ID3D11ClassInstance*)*, u32) PSSetShader;
     extern(Windows) void function(void*) PSSetSamplers;
     extern(Windows) void function(void*, ID3D11VertexShader*, const(ID3D11ClassInstance*)*, u32) VSSetShader;
-    extern(Windows) void function(void*) DrawIndexed;
+    extern(Windows) void function(void*, u32, u32, s32) DrawIndexed;
     extern(Windows) void function(void*, u32, u32) Draw;
     extern(Windows) void function(void*) Map;
     extern(Windows) void function(void*) Unmap;
     extern(Windows) void function(void*) PSSetConstantBuffers;
     extern(Windows) void function(void*, ID3D11InputLayout*) IASetInputLayout;
     extern(Windows) void function(void*, u32, u32, const(ID3D11Buffer*)*, const(u32)*, const(u32)*) IASetVertexBuffers;
-    extern(Windows) void function(void*) IASetIndexBuffer;
+    extern(Windows) void function(void*, ID3D11Buffer*, DXGI_FORMAT, u32) IASetIndexBuffer;
     extern(Windows) void function(void*) DrawIndexedInstanced;
     extern(Windows) void function(void*) DrawInstanced;
     extern(Windows) void function(void*) GSSetConstantBuffers;
@@ -932,7 +932,7 @@ struct IDXGISwapChain {
     extern(Windows) void function(void*) SetFullscreenState;
     extern(Windows) void function(void*) GetFullscreenState;
     extern(Windows) void function(void*) GetDesc;
-    extern(Windows) void function(void*) ResizeBuffers;
+    extern(Windows) HRESULT function(void*, u32, u32, u32, DXGI_FORMAT, u32) ResizeBuffers;
     extern(Windows) void function(void*) ResizeTarget;
     extern(Windows) void function(void*) GetContainingOutput;
     extern(Windows) void function(void*) GetFrameStatistics;

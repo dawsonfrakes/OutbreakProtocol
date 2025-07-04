@@ -74,7 +74,7 @@ version (Windows) {
           else clear_held_keys();
           return 0;
         case WM_SIZE:
-          platform_size = [cast(u16) lParam, cast(u16) (lParam >> 16)];
+          platform_size = [cast(u16) lParam, cast(u16) (lParam >>> 16)];
           platform_renderer.resize();
           return 0;
         case WM_CREATE:
