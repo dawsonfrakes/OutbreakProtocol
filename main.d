@@ -176,3 +176,13 @@ version (OSX) {
 
   pragma(linkerDirective, "-framework", "AppKit");
 }
+
+version (WebAssembly) {
+  import ldc.attributes : llvmAttr;
+
+  @llvmAttr("wasm-import-name", "console_log") extern(C) void console_log(const(char)[]);
+
+  extern(C) void _start() {
+    console_log("Hello, world!");
+  }
+}
