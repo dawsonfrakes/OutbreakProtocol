@@ -14,34 +14,20 @@ struct Platform_Renderer {
   void function(game.Renderer*) present;
 }
 
-struct TriangleInstance {
-  align(16) float[16] world_transform;
+struct Triangle_Instance {
+  align(16) M4 world_transform;
 }
 
-struct TriangleVertex {
-  align(16) float[3] position;
-  align(16) float[4] color;
+struct Triangle_Vertex {
+  align(16) V3 position;
+  align(16) V4 color;
 }
 
-__gshared immutable triangle_instances = [
-  TriangleInstance([
-    1.0, 0.0, 0.0, 0.5,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0,
-  ]),
-  TriangleInstance([
-    1.0, 0.0, 0.0, -0.5,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0,
-  ]),
-];
 __gshared immutable triangle_vertices = [
-  TriangleVertex([+0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
-  TriangleVertex([-0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
-  TriangleVertex([-0.5, +0.5, 0.0], [0.0, 0.0, 1.0, 1.0]),
-  TriangleVertex([+0.5, +0.5, 0.0], [1.0, 0.0, 1.0, 1.0]),
+  Triangle_Vertex(V3(+0.5, -0.5, 0.0), V4(1.0, 0.0, 0.0, 1.0)),
+  Triangle_Vertex(V3(-0.5, -0.5, 0.0), V4(0.0, 1.0, 0.0, 1.0)),
+  Triangle_Vertex(V3(-0.5, +0.5, 0.0), V4(0.0, 0.0, 1.0, 1.0)),
+  Triangle_Vertex(V3(+0.5, +0.5, 0.0), V4(1.0, 0.0, 1.0, 1.0)),
 ];
 __gshared immutable u16[6] triangle_elements = [0, 1, 2, 2, 3, 0];
 
@@ -154,19 +140,19 @@ version (D3D11) {
       input_descs[0].SemanticName = "Position";
       input_descs[0].SemanticIndex = 0;
       input_descs[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
-      input_descs[0].AlignedByteOffset = TriangleVertex.position.offsetof;
+      input_descs[0].AlignedByteOffset = Triangle_Vertex.position.offsetof;
       input_descs[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
       input_descs[1].SemanticName = "Color";
       input_descs[1].SemanticIndex = 0;
       input_descs[1].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
-      input_descs[1].AlignedByteOffset = TriangleVertex.color.offsetof;
+      input_descs[1].AlignedByteOffset = Triangle_Vertex.color.offsetof;
       input_descs[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
       foreach (i; 2..6) {
         input_descs.ptr[i].SemanticName = "Transform";
         input_descs.ptr[i].SemanticIndex = i - 2;
         input_descs.ptr[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
         input_descs.ptr[i].InputSlot = 1;
-        input_descs.ptr[i].AlignedByteOffset = cast(u32) (TriangleInstance.world_transform.offsetof + (i - 2) * (f32[4]).sizeof);
+        input_descs.ptr[i].AlignedByteOffset = cast(u32) (Triangle_Instance.world_transform.offsetof + (i - 2) * (f32[4]).sizeof);
         input_descs.ptr[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
         input_descs.ptr[i].InstanceDataStepRate = 1;
       }
@@ -174,10 +160,10 @@ version (D3D11) {
       if (hr < 0) goto error;
 
       D3D11_BUFFER_DESC triangle_vbo_desc;
-      triangle_vbo_desc.ByteWidth = cast(u32) triangle_vertices.length * cast(u32) TriangleVertex.sizeof;
+      triangle_vbo_desc.ByteWidth = cast(u32) triangle_vertices.length * cast(u32) Triangle_Vertex.sizeof;
       triangle_vbo_desc.Usage = D3D11_USAGE.DEFAULT;
       triangle_vbo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
-      triangle_vbo_desc.StructureByteStride = TriangleVertex.sizeof;
+      triangle_vbo_desc.StructureByteStride = Triangle_Vertex.sizeof;
       D3D11_SUBRESOURCE_DATA triangle_vbo_data;
       triangle_vbo_data.pSysMem = triangle_vertices.ptr;
       hr = d3d11.device.CreateBuffer(&triangle_vbo_desc, &triangle_vbo_data, &d3d11.triangle_vbo);
@@ -194,11 +180,11 @@ version (D3D11) {
       if (hr < 0) goto error;
 
       D3D11_BUFFER_DESC triangle_ibo_desc;
-      triangle_ibo_desc.ByteWidth = cast(u32) triangle_instances.length * cast(u32) triangle_instances[0].sizeof;
+      triangle_ibo_desc.ByteWidth = cast(u32) (game.Renderer.triangle_instances.N * Triangle_Instance.sizeof);
       triangle_ibo_desc.Usage = D3D11_USAGE.DYNAMIC;
       triangle_ibo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
       triangle_ibo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
-      triangle_ibo_desc.StructureByteStride = triangle_instances[0].sizeof;
+      triangle_ibo_desc.StructureByteStride = Triangle_Instance.sizeof;
       hr = d3d11.device.CreateBuffer(&triangle_ibo_desc, null, &d3d11.triangle_ibo);
       if (hr < 0) goto error;
 
@@ -284,10 +270,16 @@ version (D3D11) {
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
     d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
 
+    __gshared Bounded_Array!(game.Renderer.triangle_instances.N, Triangle_Instance) triangle_instances;
+    triangle_instances = triangle_instances.init;
+    foreach (ref instance; game_renderer.triangle_instances) {
+      triangle_instances ~= Triangle_Instance(M4.translate(instance.world_transform.position));
+    }
+
     D3D11_MAPPED_SUBRESOURCE mapping = void;
     hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ibo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapping);
     if (hr >= 0) {
-      memcpy(mapping.pData, triangle_instances.ptr, triangle_instances.length * triangle_instances[0].sizeof);
+      memcpy(mapping.pData, triangle_instances.ptr, triangle_instances.length * Triangle_Instance.sizeof);
       d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.triangle_ibo, 0);
     }
 
@@ -298,7 +290,7 @@ version (D3D11) {
     d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
     d3d11.ctx.OMSetDepthStencilState(d3d11.depthstate, 0);
     ID3D11Buffer*[2] buffers = [d3d11.triangle_vbo, d3d11.triangle_ibo];
-    u32[2] strides = [TriangleVertex.sizeof, TriangleInstance.sizeof];
+    u32[2] strides = [Triangle_Vertex.sizeof, Triangle_Instance.sizeof];
     u32[2] offsets = [0, 0];
     d3d11.ctx.IASetVertexBuffers(0, cast(u32) buffers.length, buffers.ptr, strides.ptr, offsets.ptr);
     d3d11.ctx.IASetIndexBuffer(d3d11.triangle_ebo, DXGI_FORMAT.R16_UINT, 0);
@@ -417,6 +409,7 @@ version (OpenGL) {
 
     u32 triangle_shader;
     u32 triangle_vao;
+    u32 triangle_ibo;
   }
 
   __gshared OpenGL_Data opengl;
@@ -459,38 +452,32 @@ version (OpenGL) {
     glCreateBuffers(1, &triangle_ebo);
     glNamedBufferData(triangle_ebo, triangle_elements.length * triangle_elements[0].sizeof, triangle_elements.ptr, GL_STATIC_DRAW);
 
-    __gshared immutable typeof(triangle_instances) triangle_instances_transposed = [
-      TriangleInstance(transpose(triangle_instances[0].world_transform)),
-      TriangleInstance(transpose(triangle_instances[1].world_transform)),
-    ];
-
-    u32 triangle_ibo = void;
-    glCreateBuffers(1, &triangle_ibo);
-    glNamedBufferData(triangle_ibo, triangle_instances_transposed.length * triangle_instances_transposed[0].sizeof, triangle_instances_transposed.ptr, GL_DYNAMIC_DRAW);
+    glCreateBuffers(1, &opengl.triangle_ibo);
+    glNamedBufferData(opengl.triangle_ibo, game.Renderer.triangle_instances.N * Triangle_Instance.sizeof, null, GL_DYNAMIC_DRAW);
 
     u32 vbo_binding = 0;
     u32 ibo_binding = 1;
     glCreateVertexArrays(1, &opengl.triangle_vao);
     glVertexArrayElementBuffer(opengl.triangle_vao, triangle_ebo);
-    glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, triangle_vbo, 0, TriangleVertex.sizeof);
-    glVertexArrayVertexBuffer(opengl.triangle_vao, ibo_binding, triangle_ibo, 0, TriangleInstance.sizeof);
+    glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, triangle_vbo, 0, Triangle_Vertex.sizeof);
+    glVertexArrayVertexBuffer(opengl.triangle_vao, ibo_binding, opengl.triangle_ibo, 0, Triangle_Instance.sizeof);
     glVertexArrayBindingDivisor(opengl.triangle_vao, ibo_binding, 1);
 
     u32 position_attrib = 0;
     glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
     glVertexArrayAttribBinding(opengl.triangle_vao, position_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, TriangleVertex.position.offsetof);
+    glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, Triangle_Vertex.position.offsetof);
 
     u32 color_attrib = 1;
     glEnableVertexArrayAttrib(opengl.triangle_vao, color_attrib);
     glVertexArrayAttribBinding(opengl.triangle_vao, color_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, TriangleVertex.color.offsetof);
+    glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, Triangle_Vertex.color.offsetof);
 
     u32 world_transform_attrib_base = 2;
     foreach (i; world_transform_attrib_base..world_transform_attrib_base+4) {
       glEnableVertexArrayAttrib(opengl.triangle_vao, i);
       glVertexArrayAttribBinding(opengl.triangle_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.triangle_vao, i, 4, GL_FLOAT, false, cast(u32) (TriangleInstance.world_transform.offsetof + (i - world_transform_attrib_base) * (f32[4]).sizeof));
+      glVertexArrayAttribFormat(opengl.triangle_vao, i, 4, GL_FLOAT, false, cast(u32) (Triangle_Instance.world_transform.offsetof + (i - world_transform_attrib_base) * (f32[4]).sizeof));
     }
 
     string vsrc =
@@ -567,6 +554,14 @@ version (OpenGL) {
   void opengl_present(game.Renderer* game_renderer) {
     glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
     glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &game_renderer.clear_depth);
+
+    __gshared Bounded_Array!(game.Renderer.triangle_instances.N, Triangle_Instance) triangle_instances;
+    triangle_instances = triangle_instances.init;
+    foreach (ref instance; game_renderer.triangle_instances) {
+      triangle_instances ~= Triangle_Instance(M4.translate!true(instance.world_transform.position));
+    }
+
+    glNamedBufferSubData(opengl.triangle_ibo, 0, cast(u32) (triangle_instances.length * Triangle_Instance.sizeof), triangle_instances.ptr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
     glFrontFace(GL_CW);

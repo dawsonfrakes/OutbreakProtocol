@@ -29,6 +29,22 @@ template COMClass() {
   auto opDispatch(string s, Ts...)(Ts args) => mixin("vtable."~s)(&this, args);
 }
 
+struct Bounded_Array(usize N_, T_) {
+  alias T = T_;
+  alias N = N_;
+
+  T[N] buffer;
+  usize length;
+
+  T* ptr() => buffer.ptr;
+  void opOpAssign(string s : "~")(T rhs) { buffer[length++] = rhs; }
+  ref T opIndex(Index)(Index index) => buffer[index];
+  int opApply(int delegate(ref T) dg) {
+    foreach (i; 0..length) if (dg(buffer.ptr[i])) return 1;
+    return 0;
+  }
+}
+
 extern(C) void* memcpy(void* a, const(void)* b, usize c) {
   u8* a8 = cast(u8*) a, b8 = cast(u8*) b;
   foreach (i; 0..c) a8[i] = b8[i];

@@ -116,3 +116,4 @@ enum GL_ZERO_TO_ONE = 0x935F;
 @gl_version(4, 5) extern(System) void glVertexArrayBindingDivisor(u32, u32, u32);
 @gl_version(4, 5) extern(System) void glCreateBuffers(u32, u32*);
 @gl_version(4, 5) extern(System) void glNamedBufferData(u32, usize, const(void)*, u32);
+@gl_version(4, 5) extern(System) void glNamedBufferSubData(u32, ssize, u32, const(void)*);

@@ -186,6 +186,18 @@ version (Windows) {
       return start;
     }
   }
+
+  version (assert) {
+    extern(C) noreturn _assert(const(char)* exp, const(char)* file, uint line) {
+      platform_error(file[0..strlen(file)]);
+      platform_error(exp[0..strlen(exp)]);
+      debug {
+        char buf = void;
+        ReadFile(platform_stdin, &buf, 1, null, null);
+      }
+      ExitProcess(1);
+    }
+  }
 }
 
 version (OSX) {

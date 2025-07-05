@@ -34,6 +34,7 @@ alias HMODULE = HINSTANCE;
 @foreign("kernel32") extern(Windows) s32 AllocConsole();
 @foreign("kernel32") extern(Windows) HANDLE GetStdHandle(u32);
 @foreign("kernel32") extern(Windows) s32 WriteFile(HANDLE, const(void)*, u32, u32*, void*);
+@foreign("kernel32") extern(Windows) s32 ReadFile(HANDLE, void*, u32, u32*, void*);
 @foreign("kernel32") extern(Windows) noreturn ExitProcess(u32);
 
 // user32
