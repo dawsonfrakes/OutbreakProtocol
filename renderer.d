@@ -1,5 +1,5 @@
 import basic;
-import basic.maths : min, max;
+import basic.maths;
 static import game;
 
 version (Windows) {
@@ -459,10 +459,22 @@ version (OpenGL) {
     glCreateBuffers(1, &triangle_ebo);
     glNamedBufferData(triangle_ebo, triangle_elements.length * triangle_elements[0].sizeof, triangle_elements.ptr, GL_STATIC_DRAW);
 
+    __gshared immutable typeof(triangle_instances) triangle_instances_transposed = [
+      TriangleInstance(transpose(triangle_instances[0].world_transform)),
+      TriangleInstance(transpose(triangle_instances[1].world_transform)),
+    ];
+
+    u32 triangle_ibo = void;
+    glCreateBuffers(1, &triangle_ibo);
+    glNamedBufferData(triangle_ibo, triangle_instances_transposed.length * triangle_instances_transposed[0].sizeof, triangle_instances_transposed.ptr, GL_DYNAMIC_DRAW);
+
     u32 vbo_binding = 0;
+    u32 ibo_binding = 1;
     glCreateVertexArrays(1, &opengl.triangle_vao);
     glVertexArrayElementBuffer(opengl.triangle_vao, triangle_ebo);
     glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, triangle_vbo, 0, TriangleVertex.sizeof);
+    glVertexArrayVertexBuffer(opengl.triangle_vao, ibo_binding, triangle_ibo, 0, TriangleInstance.sizeof);
+    glVertexArrayBindingDivisor(opengl.triangle_vao, ibo_binding, 1);
 
     u32 position_attrib = 0;
     glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
@@ -474,16 +486,24 @@ version (OpenGL) {
     glVertexArrayAttribBinding(opengl.triangle_vao, color_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, TriangleVertex.color.offsetof);
 
+    u32 world_transform_attrib_base = 2;
+    foreach (i; world_transform_attrib_base..world_transform_attrib_base+4) {
+      glEnableVertexArrayAttrib(opengl.triangle_vao, i);
+      glVertexArrayAttribBinding(opengl.triangle_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.triangle_vao, i, 4, GL_FLOAT, false, cast(u32) (TriangleInstance.world_transform.offsetof + (i - world_transform_attrib_base) * (f32[4]).sizeof));
+    }
+
     string vsrc =
     `#version 450
 
     layout(location = 0) in vec3 a_position;
     layout(location = 1) in vec4 a_color;
+    layout(location = 2) in mat4 i_world_transform;
 
     layout(location = 1) out vec4 f_color;
 
     void main() {
-      gl_Position = vec4(a_position, 1.0);
+      gl_Position = i_world_transform * vec4(a_position, 1.0);
       f_color = a_color;
     }`;
     const(char)*[1] vsrcs = [vsrc.ptr];
@@ -555,7 +575,7 @@ version (OpenGL) {
     glEnable(GL_DEPTH_TEST);
     glUseProgram(opengl.triangle_shader);
     glBindVertexArray(opengl.triangle_vao);
-    glDrawElements(GL_TRIANGLES, cast(u32) triangle_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0);
+    glDrawElementsInstanced(GL_TRIANGLES, cast(u32) triangle_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0, cast(u32) triangle_instances.length);
     debug {
       glDisable(GL_DEPTH_TEST);
       glDisable(GL_CULL_FACE);

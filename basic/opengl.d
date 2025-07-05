@@ -82,6 +82,9 @@ enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 @gl_version(3, 0) extern(System) void glBindFramebuffer(u32, u32);
 @gl_version(3, 0) extern(System) void glBindVertexArray(u32);
 
+// 3.1
+@gl_version(3, 1) extern(System) void glDrawElementsInstanced(u32, u32, u32, const(void)*, u32);
+
 // 3.2
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
@@ -110,5 +113,6 @@ enum GL_ZERO_TO_ONE = 0x935F;
 @gl_version(4, 5) extern(System) void glEnableVertexArrayAttrib(u32, u32);
 @gl_version(4, 5) extern(System) void glVertexArrayAttribBinding(u32, u32, u32);
 @gl_version(4, 5) extern(System) void glVertexArrayAttribFormat(u32, u32, s32, u32, bool, u32);
+@gl_version(4, 5) extern(System) void glVertexArrayBindingDivisor(u32, u32, u32);
 @gl_version(4, 5) extern(System) void glCreateBuffers(u32, u32*);
 @gl_version(4, 5) extern(System) void glNamedBufferData(u32, usize, const(void)*, u32);
