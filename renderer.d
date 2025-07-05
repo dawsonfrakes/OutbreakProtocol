@@ -14,22 +14,9 @@ struct Platform_Renderer {
   void function(game.Renderer*) present;
 }
 
-struct Triangle_Instance {
-  align(16) M4 world_transform;
+struct Quad_Instance {
+  align(16) M4 transform;
 }
-
-struct Triangle_Vertex {
-  align(16) V3 position;
-  align(16) V4 color;
-}
-
-__gshared immutable triangle_vertices = [
-  Triangle_Vertex(V3(+0.5, -0.5, 0.0), V4(1.0, 0.0, 0.0, 1.0)),
-  Triangle_Vertex(V3(-0.5, -0.5, 0.0), V4(0.0, 1.0, 0.0, 1.0)),
-  Triangle_Vertex(V3(-0.5, +0.5, 0.0), V4(0.0, 0.0, 1.0, 1.0)),
-  Triangle_Vertex(V3(+0.5, +0.5, 0.0), V4(1.0, 0.0, 1.0, 1.0)),
-];
-__gshared immutable u16[6] triangle_elements = [0, 1, 2, 2, 3, 0];
 
 __gshared immutable null_renderer = Platform_Renderer(
   {},
@@ -54,12 +41,12 @@ version (D3D11) {
     ID3D11DepthStencilView* depthbuffer_view;
     ID3D11DepthStencilState* depthstate;
 
-    ID3D11VertexShader* triangle_vshader;
-    ID3D11PixelShader* triangle_pshader;
-    ID3D11InputLayout* triangle_input_layout;
-    ID3D11Buffer* triangle_vbo;
-    ID3D11Buffer* triangle_ebo;
-    ID3D11Buffer* triangle_ibo;
+    ID3D11VertexShader* quad_vshader;
+    ID3D11PixelShader* quad_pshader;
+    ID3D11InputLayout* quad_input_layout;
+    ID3D11Buffer* quad_vbo;
+    ID3D11Buffer* quad_ebo;
+    ID3D11Buffer* quad_ibo;
   }
 
   __gshared D3D11_Data d3d11;
@@ -101,7 +88,7 @@ version (D3D11) {
       struct VInput {
         float3 position : Position;
         float4 color : Color;
-        matrix world_transform : Transform;
+        matrix transform : Transform;
       };
       struct VOutput {
         float4 position : SV_Position;
@@ -110,7 +97,7 @@ version (D3D11) {
 
       VOutput vmain(VInput input) {
         VOutput output;
-        output.position = mul(float4(input.position, 1.0f), input.world_transform);
+        output.position = mul(float4(input.position, 1.0f), input.transform);
         output.color = input.color;
         return output;
       }
@@ -130,62 +117,62 @@ version (D3D11) {
       if (hr < 0) goto error;
       scope(exit) pblob.Release();
 
-      hr = d3d11.device.CreateVertexShader(vblob.GetBufferPointer(), vblob.GetBufferSize(), null, &d3d11.triangle_vshader);
+      hr = d3d11.device.CreateVertexShader(vblob.GetBufferPointer(), vblob.GetBufferSize(), null, &d3d11.quad_vshader);
       if (hr < 0) goto error;
 
-      hr = d3d11.device.CreatePixelShader(pblob.GetBufferPointer(), pblob.GetBufferSize(), null, &d3d11.triangle_pshader);
+      hr = d3d11.device.CreatePixelShader(pblob.GetBufferPointer(), pblob.GetBufferSize(), null, &d3d11.quad_pshader);
       if (hr < 0) goto error;
 
       D3D11_INPUT_ELEMENT_DESC[6] input_descs;
       input_descs[0].SemanticName = "Position";
       input_descs[0].SemanticIndex = 0;
       input_descs[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
-      input_descs[0].AlignedByteOffset = Triangle_Vertex.position.offsetof;
+      input_descs[0].AlignedByteOffset = game.Quad_Vertex.position.offsetof;
       input_descs[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
       input_descs[1].SemanticName = "Color";
       input_descs[1].SemanticIndex = 0;
       input_descs[1].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
-      input_descs[1].AlignedByteOffset = Triangle_Vertex.color.offsetof;
+      input_descs[1].AlignedByteOffset = game.Quad_Vertex.color.offsetof;
       input_descs[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
       foreach (i; 2..6) {
         input_descs.ptr[i].SemanticName = "Transform";
         input_descs.ptr[i].SemanticIndex = i - 2;
         input_descs.ptr[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
         input_descs.ptr[i].InputSlot = 1;
-        input_descs.ptr[i].AlignedByteOffset = cast(u32) (Triangle_Instance.world_transform.offsetof + (i - 2) * (f32[4]).sizeof);
+        input_descs.ptr[i].AlignedByteOffset = cast(u32) (Quad_Instance.transform.offsetof + (i - 2) * (f32[4]).sizeof);
         input_descs.ptr[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
         input_descs.ptr[i].InstanceDataStepRate = 1;
       }
-      hr = d3d11.device.CreateInputLayout(input_descs.ptr, cast(u32) input_descs.length, vblob.GetBufferPointer(), vblob.GetBufferSize(), &d3d11.triangle_input_layout);
+      hr = d3d11.device.CreateInputLayout(input_descs.ptr, cast(u32) input_descs.length, vblob.GetBufferPointer(), vblob.GetBufferSize(), &d3d11.quad_input_layout);
       if (hr < 0) goto error;
 
-      D3D11_BUFFER_DESC triangle_vbo_desc;
-      triangle_vbo_desc.ByteWidth = cast(u32) triangle_vertices.length * cast(u32) Triangle_Vertex.sizeof;
-      triangle_vbo_desc.Usage = D3D11_USAGE.DEFAULT;
-      triangle_vbo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
-      triangle_vbo_desc.StructureByteStride = Triangle_Vertex.sizeof;
-      D3D11_SUBRESOURCE_DATA triangle_vbo_data;
-      triangle_vbo_data.pSysMem = triangle_vertices.ptr;
-      hr = d3d11.device.CreateBuffer(&triangle_vbo_desc, &triangle_vbo_data, &d3d11.triangle_vbo);
+      D3D11_BUFFER_DESC quad_vbo_desc;
+      quad_vbo_desc.ByteWidth = cast(u32) game.quad_vertices.length * cast(u32) game.Quad_Vertex.sizeof;
+      quad_vbo_desc.Usage = D3D11_USAGE.DEFAULT;
+      quad_vbo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+      quad_vbo_desc.StructureByteStride = game.Quad_Vertex.sizeof;
+      D3D11_SUBRESOURCE_DATA quad_vbo_data;
+      quad_vbo_data.pSysMem = game.quad_vertices.ptr;
+      hr = d3d11.device.CreateBuffer(&quad_vbo_desc, &quad_vbo_data, &d3d11.quad_vbo);
       if (hr < 0) goto error;
 
-      D3D11_BUFFER_DESC triangle_ebo_desc;
-      triangle_ebo_desc.ByteWidth = cast(u32) triangle_elements.length * cast(u32) triangle_elements[0].sizeof;
-      triangle_ebo_desc.Usage = D3D11_USAGE.DEFAULT;
-      triangle_ebo_desc.BindFlags = D3D11_BIND_FLAG.INDEX_BUFFER;
-      triangle_ebo_desc.StructureByteStride = triangle_elements[0].sizeof;
-      D3D11_SUBRESOURCE_DATA triangle_ebo_data;
-      triangle_ebo_data.pSysMem = triangle_elements.ptr;
-      hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
+      D3D11_BUFFER_DESC quad_ebo_desc;
+      quad_ebo_desc.ByteWidth = cast(u32) game.quad_elements.length * cast(u32) game.quad_elements[0].sizeof;
+      quad_ebo_desc.Usage = D3D11_USAGE.DEFAULT;
+      quad_ebo_desc.BindFlags = D3D11_BIND_FLAG.INDEX_BUFFER;
+      quad_ebo_desc.StructureByteStride = game.quad_elements[0].sizeof;
+      D3D11_SUBRESOURCE_DATA quad_ebo_data;
+      quad_ebo_data.pSysMem = game.quad_elements.ptr;
+      hr = d3d11.device.CreateBuffer(&quad_ebo_desc, &quad_ebo_data, &d3d11.quad_ebo);
       if (hr < 0) goto error;
 
-      D3D11_BUFFER_DESC triangle_ibo_desc;
-      triangle_ibo_desc.ByteWidth = cast(u32) (game.Renderer.triangle_instances.N * Triangle_Instance.sizeof);
-      triangle_ibo_desc.Usage = D3D11_USAGE.DYNAMIC;
-      triangle_ibo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
-      triangle_ibo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
-      triangle_ibo_desc.StructureByteStride = Triangle_Instance.sizeof;
-      hr = d3d11.device.CreateBuffer(&triangle_ibo_desc, null, &d3d11.triangle_ibo);
+      D3D11_BUFFER_DESC quad_ibo_desc;
+      quad_ibo_desc.ByteWidth = cast(u32) (game.Renderer.quads.N * Quad_Instance.sizeof);
+      quad_ibo_desc.Usage = D3D11_USAGE.DYNAMIC;
+      quad_ibo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+      quad_ibo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
+      quad_ibo_desc.StructureByteStride = Quad_Instance.sizeof;
+      hr = d3d11.device.CreateBuffer(&quad_ibo_desc, null, &d3d11.quad_ibo);
       if (hr < 0) goto error;
 
       D3D11_DEPTH_STENCIL_DESC depthstate_desc;
@@ -207,12 +194,12 @@ version (D3D11) {
     if (d3d11.depthbuffer_view) d3d11.depthbuffer_view.Release();
     if (d3d11.depthbuffer) d3d11.depthbuffer.Release();
 
-    if (d3d11.triangle_ibo) d3d11.triangle_ibo.Release();
-    if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
-    if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
-    if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
-    if (d3d11.triangle_pshader) d3d11.triangle_pshader.Release();
-    if (d3d11.triangle_vshader) d3d11.triangle_vshader.Release();
+    if (d3d11.quad_ibo) d3d11.quad_ibo.Release();
+    if (d3d11.quad_ebo) d3d11.quad_ebo.Release();
+    if (d3d11.quad_vbo) d3d11.quad_vbo.Release();
+    if (d3d11.quad_input_layout) d3d11.quad_input_layout.Release();
+    if (d3d11.quad_pshader) d3d11.quad_pshader.Release();
+    if (d3d11.quad_vshader) d3d11.quad_vshader.Release();
 
     if (d3d11.backbuffer_view) d3d11.backbuffer_view.Release();
 
@@ -270,30 +257,30 @@ version (D3D11) {
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
     d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
 
-    __gshared Bounded_Array!(game.Renderer.triangle_instances.N, Triangle_Instance) triangle_instances;
-    triangle_instances = triangle_instances.init;
-    foreach (ref instance; game_renderer.triangle_instances) {
-      triangle_instances ~= Triangle_Instance(M4.translate(instance.world_transform.position));
+    __gshared Bounded_Array!(game.Renderer.quads.N, Quad_Instance) quads;
+    quads = quads.init;
+    foreach (ref instance; game_renderer.quads) {
+      quads ~= Quad_Instance(M4.translate(instance.transform.position));
     }
 
     D3D11_MAPPED_SUBRESOURCE mapping = void;
-    hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ibo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapping);
+    hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.quad_ibo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapping);
     if (hr >= 0) {
-      memcpy(mapping.pData, triangle_instances.ptr, triangle_instances.length * Triangle_Instance.sizeof);
-      d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.triangle_ibo, 0);
+      memcpy(mapping.pData, quads.ptr, quads.length * Quad_Instance.sizeof);
+      d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.quad_ibo, 0);
     }
 
-    d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
-    d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
-    d3d11.ctx.IASetInputLayout(d3d11.triangle_input_layout);
+    d3d11.ctx.VSSetShader(d3d11.quad_vshader, null, 0);
+    d3d11.ctx.PSSetShader(d3d11.quad_pshader, null, 0);
+    d3d11.ctx.IASetInputLayout(d3d11.quad_input_layout);
     d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
     d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
     d3d11.ctx.OMSetDepthStencilState(d3d11.depthstate, 0);
-    ID3D11Buffer*[2] buffers = [d3d11.triangle_vbo, d3d11.triangle_ibo];
-    u32[2] strides = [Triangle_Vertex.sizeof, Triangle_Instance.sizeof];
+    ID3D11Buffer*[2] buffers = [d3d11.quad_vbo, d3d11.quad_ibo];
+    u32[2] strides = [game.Quad_Vertex.sizeof, Quad_Instance.sizeof];
     u32[2] offsets = [0, 0];
     d3d11.ctx.IASetVertexBuffers(0, cast(u32) buffers.length, buffers.ptr, strides.ptr, offsets.ptr);
-    d3d11.ctx.IASetIndexBuffer(d3d11.triangle_ebo, DXGI_FORMAT.R16_UINT, 0);
+    d3d11.ctx.IASetIndexBuffer(d3d11.quad_ebo, DXGI_FORMAT.R16_UINT, 0);
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
@@ -302,7 +289,7 @@ version (D3D11) {
     viewport.MinDepth = 0.0;
     viewport.MaxDepth = 1.0;
     d3d11.ctx.RSSetViewports(1, &viewport);
-    d3d11.ctx.DrawIndexedInstanced(cast(u32) triangle_elements.length, cast(u32) triangle_instances.length, 0, 0, 0);
+    d3d11.ctx.DrawIndexedInstanced(cast(u32) game.quad_elements.length, cast(u32) quads.length, 0, 0, 0);
 
     d3d11.swapchain.Present(1, 0);
   }
@@ -407,9 +394,9 @@ version (OpenGL) {
     u32 main_fbo_color0;
     u32 main_fbo_depth;
 
-    u32 triangle_shader;
-    u32 triangle_vao;
-    u32 triangle_ibo;
+    u32 quad_shader;
+    u32 quad_vao;
+    u32 quad_ibo;
   }
 
   __gshared OpenGL_Data opengl;
@@ -444,40 +431,40 @@ version (OpenGL) {
     glCreateRenderbuffers(1, &opengl.main_fbo_color0);
     glCreateRenderbuffers(1, &opengl.main_fbo_depth);
 
-    u32 triangle_vbo = void;
-    glCreateBuffers(1, &triangle_vbo);
-    glNamedBufferData(triangle_vbo, triangle_vertices.length * triangle_vertices[0].sizeof, triangle_vertices.ptr, GL_STATIC_DRAW);
+    u32 quad_vbo = void;
+    glCreateBuffers(1, &quad_vbo);
+    glNamedBufferData(quad_vbo, game.quad_vertices.length * game.quad_vertices[0].sizeof, game.quad_vertices.ptr, GL_STATIC_DRAW);
 
-    u32 triangle_ebo = void;
-    glCreateBuffers(1, &triangle_ebo);
-    glNamedBufferData(triangle_ebo, triangle_elements.length * triangle_elements[0].sizeof, triangle_elements.ptr, GL_STATIC_DRAW);
+    u32 quad_ebo = void;
+    glCreateBuffers(1, &quad_ebo);
+    glNamedBufferData(quad_ebo, game.quad_elements.length * game.quad_elements[0].sizeof, game.quad_elements.ptr, GL_STATIC_DRAW);
 
-    glCreateBuffers(1, &opengl.triangle_ibo);
-    glNamedBufferData(opengl.triangle_ibo, game.Renderer.triangle_instances.N * Triangle_Instance.sizeof, null, GL_DYNAMIC_DRAW);
+    glCreateBuffers(1, &opengl.quad_ibo);
+    glNamedBufferData(opengl.quad_ibo, game.Renderer.quads.N * Quad_Instance.sizeof, null, GL_DYNAMIC_DRAW);
 
     u32 vbo_binding = 0;
     u32 ibo_binding = 1;
-    glCreateVertexArrays(1, &opengl.triangle_vao);
-    glVertexArrayElementBuffer(opengl.triangle_vao, triangle_ebo);
-    glVertexArrayVertexBuffer(opengl.triangle_vao, vbo_binding, triangle_vbo, 0, Triangle_Vertex.sizeof);
-    glVertexArrayVertexBuffer(opengl.triangle_vao, ibo_binding, opengl.triangle_ibo, 0, Triangle_Instance.sizeof);
-    glVertexArrayBindingDivisor(opengl.triangle_vao, ibo_binding, 1);
+    glCreateVertexArrays(1, &opengl.quad_vao);
+    glVertexArrayElementBuffer(opengl.quad_vao, quad_ebo);
+    glVertexArrayVertexBuffer(opengl.quad_vao, vbo_binding, quad_vbo, 0, game.Quad_Vertex.sizeof);
+    glVertexArrayVertexBuffer(opengl.quad_vao, ibo_binding, opengl.quad_ibo, 0, Quad_Instance.sizeof);
+    glVertexArrayBindingDivisor(opengl.quad_vao, ibo_binding, 1);
 
     u32 position_attrib = 0;
-    glEnableVertexArrayAttrib(opengl.triangle_vao, position_attrib);
-    glVertexArrayAttribBinding(opengl.triangle_vao, position_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.triangle_vao, position_attrib, 3, GL_FLOAT, false, Triangle_Vertex.position.offsetof);
+    glEnableVertexArrayAttrib(opengl.quad_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.quad_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.quad_vao, position_attrib, 3, GL_FLOAT, false, game.Quad_Vertex.position.offsetof);
 
     u32 color_attrib = 1;
-    glEnableVertexArrayAttrib(opengl.triangle_vao, color_attrib);
-    glVertexArrayAttribBinding(opengl.triangle_vao, color_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.triangle_vao, color_attrib, 4, GL_FLOAT, false, Triangle_Vertex.color.offsetof);
+    glEnableVertexArrayAttrib(opengl.quad_vao, color_attrib);
+    glVertexArrayAttribBinding(opengl.quad_vao, color_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.quad_vao, color_attrib, 4, GL_FLOAT, false, game.Quad_Vertex.color.offsetof);
 
     u32 world_transform_attrib_base = 2;
     foreach (i; world_transform_attrib_base..world_transform_attrib_base+4) {
-      glEnableVertexArrayAttrib(opengl.triangle_vao, i);
-      glVertexArrayAttribBinding(opengl.triangle_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.triangle_vao, i, 4, GL_FLOAT, false, cast(u32) (Triangle_Instance.world_transform.offsetof + (i - world_transform_attrib_base) * (f32[4]).sizeof));
+      glEnableVertexArrayAttrib(opengl.quad_vao, i);
+      glVertexArrayAttribBinding(opengl.quad_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, cast(u32) (Quad_Instance.transform.offsetof + (i - world_transform_attrib_base) * (f32[4]).sizeof));
     }
 
     string vsrc =
@@ -513,12 +500,12 @@ version (OpenGL) {
     glShaderSource(fshader, cast(u32) fsrcs.length, fsrcs.ptr, null);
     glCompileShader(fshader);
 
-    opengl.triangle_shader = glCreateProgram();
-    glAttachShader(opengl.triangle_shader, vshader);
-    glAttachShader(opengl.triangle_shader, fshader);
-    glLinkProgram(opengl.triangle_shader);
-    glDetachShader(opengl.triangle_shader, fshader);
-    glDetachShader(opengl.triangle_shader, vshader);
+    opengl.quad_shader = glCreateProgram();
+    glAttachShader(opengl.quad_shader, vshader);
+    glAttachShader(opengl.quad_shader, fshader);
+    glLinkProgram(opengl.quad_shader);
+    glDetachShader(opengl.quad_shader, fshader);
+    glDetachShader(opengl.quad_shader, vshader);
 
     glDeleteShader(fshader);
     glDeleteShader(vshader);
@@ -555,22 +542,22 @@ version (OpenGL) {
     glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
     glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &game_renderer.clear_depth);
 
-    __gshared Bounded_Array!(game.Renderer.triangle_instances.N, Triangle_Instance) triangle_instances;
-    triangle_instances = triangle_instances.init;
-    foreach (ref instance; game_renderer.triangle_instances) {
-      triangle_instances ~= Triangle_Instance(M4.translate!true(instance.world_transform.position));
+    __gshared Bounded_Array!(game.Renderer.quads.N, Quad_Instance) quads;
+    quads = quads.init;
+    foreach (ref instance; game_renderer.quads) {
+      quads ~= Quad_Instance(M4.translate!true(instance.transform.position));
     }
 
-    glNamedBufferSubData(opengl.triangle_ibo, 0, cast(u32) (triangle_instances.length * Triangle_Instance.sizeof), triangle_instances.ptr);
+    glNamedBufferSubData(opengl.quad_ibo, 0, cast(u32) (quads.length * Quad_Instance.sizeof), quads.ptr);
 
     glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
     glFrontFace(GL_CW);
     glEnable(GL_CULL_FACE);
     glDepthFunc(GL_GEQUAL);
     glEnable(GL_DEPTH_TEST);
-    glUseProgram(opengl.triangle_shader);
-    glBindVertexArray(opengl.triangle_vao);
-    glDrawElementsInstanced(GL_TRIANGLES, cast(u32) triangle_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0, cast(u32) triangle_instances.length);
+    glUseProgram(opengl.quad_shader);
+    glBindVertexArray(opengl.quad_vao);
+    glDrawElementsInstanced(GL_TRIANGLES, cast(u32) game.quad_elements.length, GL_UNSIGNED_SHORT, cast(void*) 0, cast(u32) quads.length);
     debug {
       glDisable(GL_DEPTH_TEST);
       glDisable(GL_CULL_FACE);
