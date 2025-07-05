@@ -14,11 +14,29 @@ struct Platform_Renderer {
   void function(game.Renderer*) present;
 }
 
+struct TriangleInstance {
+  align(16) float[16] world_transform;
+}
+
 struct TriangleVertex {
   align(16) float[3] position;
   align(16) float[4] color;
 }
 
+__gshared immutable triangle_instances = [
+  TriangleInstance([
+    1.0, 0.0, 0.0, 0.5,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+  ]),
+  TriangleInstance([
+    1.0, 0.0, 0.0, -0.5,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+  ]),
+];
 __gshared immutable triangle_vertices = [
   TriangleVertex([+0.5, -0.5, 0.0], [1.0, 0.0, 0.0, 1.0]),
   TriangleVertex([-0.5, -0.5, 0.0], [0.0, 1.0, 0.0, 1.0]),
@@ -55,6 +73,7 @@ version (D3D11) {
     ID3D11InputLayout* triangle_input_layout;
     ID3D11Buffer* triangle_vbo;
     ID3D11Buffer* triangle_ebo;
+    ID3D11Buffer* triangle_ibo;
   }
 
   __gshared D3D11_Data d3d11;
@@ -96,6 +115,7 @@ version (D3D11) {
       struct VInput {
         float3 position : Position;
         float4 color : Color;
+        matrix world_transform : Transform;
       };
       struct VOutput {
         float4 position : SV_Position;
@@ -104,7 +124,7 @@ version (D3D11) {
 
       VOutput vmain(VInput input) {
         VOutput output;
-        output.position = float4(input.position, 1.0f);
+        output.position = mul(float4(input.position, 1.0f), input.world_transform);
         output.color = input.color;
         return output;
       }
@@ -130,7 +150,7 @@ version (D3D11) {
       hr = d3d11.device.CreatePixelShader(pblob.GetBufferPointer(), pblob.GetBufferSize(), null, &d3d11.triangle_pshader);
       if (hr < 0) goto error;
 
-      D3D11_INPUT_ELEMENT_DESC[2] input_descs;
+      D3D11_INPUT_ELEMENT_DESC[6] input_descs;
       input_descs[0].SemanticName = "Position";
       input_descs[0].SemanticIndex = 0;
       input_descs[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
@@ -141,6 +161,15 @@ version (D3D11) {
       input_descs[1].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
       input_descs[1].AlignedByteOffset = TriangleVertex.color.offsetof;
       input_descs[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+      foreach (i; 2..6) {
+        input_descs.ptr[i].SemanticName = "Transform";
+        input_descs.ptr[i].SemanticIndex = i - 2;
+        input_descs.ptr[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
+        input_descs.ptr[i].InputSlot = 1;
+        input_descs.ptr[i].AlignedByteOffset = cast(u32) (TriangleInstance.world_transform.offsetof + (i - 2) * (f32[4]).sizeof);
+        input_descs.ptr[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
+        input_descs.ptr[i].InstanceDataStepRate = 1;
+      }
       hr = d3d11.device.CreateInputLayout(input_descs.ptr, cast(u32) input_descs.length, vblob.GetBufferPointer(), vblob.GetBufferSize(), &d3d11.triangle_input_layout);
       if (hr < 0) goto error;
 
@@ -164,6 +193,15 @@ version (D3D11) {
       hr = d3d11.device.CreateBuffer(&triangle_ebo_desc, &triangle_ebo_data, &d3d11.triangle_ebo);
       if (hr < 0) goto error;
 
+      D3D11_BUFFER_DESC triangle_ibo_desc;
+      triangle_ibo_desc.ByteWidth = cast(u32) triangle_instances.length * cast(u32) triangle_instances[0].sizeof;
+      triangle_ibo_desc.Usage = D3D11_USAGE.DYNAMIC;
+      triangle_ibo_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+      triangle_ibo_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
+      triangle_ibo_desc.StructureByteStride = triangle_instances[0].sizeof;
+      hr = d3d11.device.CreateBuffer(&triangle_ibo_desc, null, &d3d11.triangle_ibo);
+      if (hr < 0) goto error;
+
       D3D11_DEPTH_STENCIL_DESC depthstate_desc;
       depthstate_desc.DepthEnable = true;
       depthstate_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK.ALL;
@@ -183,6 +221,7 @@ version (D3D11) {
     if (d3d11.depthbuffer_view) d3d11.depthbuffer_view.Release();
     if (d3d11.depthbuffer) d3d11.depthbuffer.Release();
 
+    if (d3d11.triangle_ibo) d3d11.triangle_ibo.Release();
     if (d3d11.triangle_ebo) d3d11.triangle_ebo.Release();
     if (d3d11.triangle_vbo) d3d11.triangle_vbo.Release();
     if (d3d11.triangle_input_layout) d3d11.triangle_input_layout.Release();
@@ -240,8 +279,17 @@ version (D3D11) {
 
   void d3d11_present(game.Renderer* game_renderer) {
     if (!d3d11.initted) return;
+    HRESULT hr = void;
+
     d3d11.ctx.ClearRenderTargetView(d3d11.backbuffer_view, game_renderer.clear_color0.ptr);
     d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
+
+    D3D11_MAPPED_SUBRESOURCE mapping = void;
+    hr = d3d11.ctx.Map(cast(ID3D11Resource*) d3d11.triangle_ibo, 0, D3D11_MAP.WRITE_DISCARD, 0, &mapping);
+    if (hr >= 0) {
+      memcpy(mapping.pData, triangle_instances.ptr, triangle_instances.length * triangle_instances[0].sizeof);
+      d3d11.ctx.Unmap(cast(ID3D11Resource*) d3d11.triangle_ibo, 0);
+    }
 
     d3d11.ctx.VSSetShader(d3d11.triangle_vshader, null, 0);
     d3d11.ctx.PSSetShader(d3d11.triangle_pshader, null, 0);
@@ -249,9 +297,10 @@ version (D3D11) {
     d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
     d3d11.ctx.OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
     d3d11.ctx.OMSetDepthStencilState(d3d11.depthstate, 0);
-    u32 stride = TriangleVertex.sizeof;
-    u32 offset = 0;
-    d3d11.ctx.IASetVertexBuffers(0, 1, &d3d11.triangle_vbo, &stride, &offset);
+    ID3D11Buffer*[2] buffers = [d3d11.triangle_vbo, d3d11.triangle_ibo];
+    u32[2] strides = [TriangleVertex.sizeof, TriangleInstance.sizeof];
+    u32[2] offsets = [0, 0];
+    d3d11.ctx.IASetVertexBuffers(0, cast(u32) buffers.length, buffers.ptr, strides.ptr, offsets.ptr);
     d3d11.ctx.IASetIndexBuffer(d3d11.triangle_ebo, DXGI_FORMAT.R16_UINT, 0);
     D3D11_VIEWPORT viewport;
     viewport.TopLeftX = 0;
@@ -261,7 +310,7 @@ version (D3D11) {
     viewport.MinDepth = 0.0;
     viewport.MaxDepth = 1.0;
     d3d11.ctx.RSSetViewports(1, &viewport);
-    d3d11.ctx.DrawIndexed(cast(u32) triangle_elements.length, 0, 0);
+    d3d11.ctx.DrawIndexedInstanced(cast(u32) triangle_elements.length, cast(u32) triangle_instances.length, 0, 0, 0);
 
     d3d11.swapchain.Present(1, 0);
   }
@@ -385,6 +434,15 @@ version (OpenGL) {
     debug {
       glEnable(GL_DEBUG_OUTPUT);
       glDebugMessageCallback(&opengl_debug_proc, null);
+
+      import main : platform_log;
+      platform_log("OpenGL Renderer Info:");
+      const vendor = glGetString(GL_VENDOR);
+      platform_log(vendor[0..strlen(vendor)]);
+      const renderer = glGetString(GL_RENDERER);
+      platform_log(renderer[0..strlen(renderer)]);
+      const version_ = glGetString(GL_VERSION);
+      platform_log(version_[0..strlen(version_)]);
     }
 
     glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);

@@ -483,6 +483,10 @@ enum D3D11_BIND_FLAG : u32 { // @EnumFlags
   DECODER = 0x200,
   VIDEO_ENCODER = 0x400,
 }
+enum D3D11_CPU_ACCESS_FLAG : u32 { // @EnumFlags
+  WRITE = 0x10000,
+  READ = 0x20000,
+}
 struct D3D11_SUBRESOURCE_DATA {
   const(void)* pSysMem;
   u32 SysMemPitch;
@@ -551,6 +555,18 @@ struct D3D11_DEPTH_STENCIL_DESC {
   u8 StencilWriteMask;
   D3D11_DEPTH_STENCILOP_DESC FrontFace;
   D3D11_DEPTH_STENCILOP_DESC BackFace;
+}
+enum D3D11_MAP : s32 {
+  READ = 1,
+  WRITE = 2,
+  READ_WRITE = 3,
+  WRITE_DISCARD = 4,
+  WRITE_NO_OVERWRITE = 5,
+}
+struct D3D11_MAPPED_SUBRESOURCE {
+  void* pData;
+  u32 RowPitch;
+  u32 DepthPitch;
 }
 struct ID3DBlob {
   struct VTable {
@@ -726,13 +742,13 @@ struct ID3D11DeviceContext {
     extern(Windows) void function(void*, ID3D11VertexShader*, const(ID3D11ClassInstance*)*, u32) VSSetShader;
     extern(Windows) void function(void*, u32, u32, s32) DrawIndexed;
     extern(Windows) void function(void*, u32, u32) Draw;
-    extern(Windows) void function(void*) Map;
-    extern(Windows) void function(void*) Unmap;
+    extern(Windows) HRESULT function(void*, ID3D11Resource*, u32, D3D11_MAP, u32, D3D11_MAPPED_SUBRESOURCE*) Map;
+    extern(Windows) void function(void*, ID3D11Resource*, u32) Unmap;
     extern(Windows) void function(void*) PSSetConstantBuffers;
     extern(Windows) void function(void*, ID3D11InputLayout*) IASetInputLayout;
     extern(Windows) void function(void*, u32, u32, const(ID3D11Buffer*)*, const(u32)*, const(u32)*) IASetVertexBuffers;
     extern(Windows) void function(void*, ID3D11Buffer*, DXGI_FORMAT, u32) IASetIndexBuffer;
-    extern(Windows) void function(void*) DrawIndexedInstanced;
+    extern(Windows) void function(void*, u32, u32, u32, s32, u32) DrawIndexedInstanced;
     extern(Windows) void function(void*) DrawInstanced;
     extern(Windows) void function(void*) GSSetConstantBuffers;
     extern(Windows) void function(void*) GSSetShader;

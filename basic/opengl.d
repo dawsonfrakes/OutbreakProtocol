@@ -45,6 +45,7 @@ enum GL_LINEAR = 0x2601;
 @gl_version(1, 0) extern(System) void glFrontFace(u32);
 @gl_version(1, 0) extern(System) void glDepthFunc(u32);
 @gl_version(1, 0) extern(System) void glViewport(s32, s32, u32, u32);
+@gl_version(1, 0) extern(System) const(char)* glGetString(u32);
 
 // 1.1
 @gl_version(1, 1) extern(System) void glDrawElements(u32, u32, u32, const(void)*);

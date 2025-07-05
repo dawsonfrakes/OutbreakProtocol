@@ -28,3 +28,15 @@ template COMClass() {
   VTable* vtable;
   auto opDispatch(string s, Ts...)(Ts args) => mixin("vtable."~s)(&this, args);
 }
+
+extern(C) void* memcpy(void* a, const(void)* b, usize c) {
+  u8* a8 = cast(u8*) a, b8 = cast(u8*) b;
+  foreach (i; 0..c) a8[i] = b8[i];
+  return a;
+}
+
+extern(C) ssize strlen(const(char)* s) {
+  const(char)* start = s;
+  while (*s) s += 1;
+  return s - start;
+}
