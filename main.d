@@ -192,6 +192,7 @@ version (OSX) {
   import basic.macos;
 
   __gshared NSApplication* platform_app;
+  __gshared NSWindow* platform_window;
 
   extern(C) noreturn main() {
     NSApplicationLoad();
@@ -199,6 +200,21 @@ version (OSX) {
 
     platform_app = NSApplication.sharedApplication();
     platform_app.setActivationPolicy(NSApplication.ActivationPolicy.REGULAR);
+
+    platform_window = NSWindow.alloc().initWithContentRect(
+      CGRect(CGPoint(0, 0), CGSize(640, 480)),
+      NSWindow.StyleMask.TITLED | NSWindow.StyleMask.CLOSABLE | NSWindow.StyleMask.MINIATURIZABLE | NSWindow.StyleMask.RESIZABLE,
+      NSWindow.BackingStore.BUFFERED,
+      false);
+    platform_window.setTitle(NSString.alloc().initWithUTF8String("Outbreak Protocol"));
+    platform_window.makeKeyAndOrderFront(null);
+
+    main_loop: while (true) {
+      while (NSEvent* ev = platform_app.nextEvent(NSEvent.Mask.ANY, null, NSDefaultRunLoopMode, true)) {
+        platform_app.sendEvent(ev);
+        ev.release();
+      }
+    }
 
     _exit(0);
   }
