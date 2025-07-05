@@ -9,12 +9,24 @@
 #include <mmsystem.h>
 #include <hidusage.h>
 
+#if OP_DEBUG
+  static HANDLE platform_stdout;
+#endif
 static HINSTANCE platform_hinstance;
 static HWND platform_hwnd;
 static HDC platform_hdc;
 static u16 platform_size[2];
 static u16 platform_mouse[2];
 static s32 platform_mouse_delta[2];
+
+static void platform_log(string s) {
+  #if OP_DEBUG
+    string prefix = "LOG: ";
+    WriteFile(platform_stdout, prefix.data, cast(u32, prefix.count), nullptr, nullptr);
+    WriteFile(platform_stdout, s.data, cast(u32, s.count), nullptr, nullptr);
+    WriteFile(platform_stdout, "\n", 1, nullptr, nullptr);
+  #endif
+}
 
 #include "renderer.cpp"
 
@@ -59,6 +71,8 @@ static void platform_debug_set_window_title_to_platform_renderer() {
 }
 
 static void platform_switch_renderer(Platform_Renderer* renderer) {
+  platform_log("Switching API");
+
   platform_renderer->deinit();
   platform_renderer = renderer;
   platform_renderer->init();
@@ -69,6 +83,11 @@ static void platform_switch_renderer(Platform_Renderer* renderer) {
 
 extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
   platform_hinstance = GetModuleHandleW(nullptr);
+
+  #if OP_DEBUG
+    AllocConsole();
+    platform_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+  #endif
 
   WSADATA wsadata;
   bool networking_supported = WSAStartup(0x202, &wsadata) == 0;

@@ -1,10 +1,20 @@
+struct Game_Quad_Vertex {
+  v3 position;
+  v2 texcoord;
+};
+
+static Game_Quad_Vertex quad_vertices[4] = {
+  {{+0.5f, -0.5f, 0.0f}, {1.0f, 0.0f}},
+  {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f}},
+  {{-0.5f, +0.5f, 0.0f}, {0.0f, 1.0f}},
+  {{+0.5f, +0.5f, 0.0f}, {1.0f, 1.0f}},
+};
+static u16 quad_indices[6] = {0, 1, 2, 2, 3, 0};
+
 struct Game_Renderer {
-  f32 clear_color0[4];
+  v4 clear_color0;
 };
 
 static void game_update_and_render(Game_Renderer* renderer) {
-  renderer->clear_color0[0] = 0.6f;
-  renderer->clear_color0[1] = 0.2f;
-  renderer->clear_color0[2] = 0.2f;
-  renderer->clear_color0[3] = 1.0f;
+  renderer->clear_color0 = {0.6f, 0.2f, 0.2f, 1.0f};
 }

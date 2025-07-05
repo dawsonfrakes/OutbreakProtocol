@@ -14,12 +14,20 @@ static struct {
 
   ID3D11Texture2D* depthbuffer;
   ID3D11DepthStencilView* depthbuffer_view;
+
+  ID3D11Buffer* quad_vertex_buffer;
+  ID3D11Buffer* quad_index_buffer;
+  ID3D11VertexShader* quad_vertex_shader;
+  ID3D11PixelShader* quad_pixel_shader;
+  ID3D11InputLayout* quad_input_layout;
 } d3d11;
 
 static void d3d11_deinit();
 
 static void d3d11_init() {
-  HRESULT hr;
+  HRESULT hr = 0;
+  ID3DBlob* vblob = nullptr;
+  ID3DBlob* pblob = nullptr;
   {
     DXGI_SWAP_CHAIN_DESC swapchain_descriptor = {};
     swapchain_descriptor.BufferDesc.Width = platform_size[0];
@@ -34,7 +42,7 @@ static void d3d11_init() {
     hr = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
       D3D11_CREATE_DEVICE_DEBUG, nullptr, 0, D3D11_SDK_VERSION,
       &swapchain_descriptor, &d3d11.swapchain, &d3d11.device, nullptr, &d3d11.ctx);
-    if (FAILED(hr)) goto error;
+    if (FAILED(hr)) goto defer;
 
     IDXGIDevice* dxgi_device;
     if (SUCCEEDED(d3d11.swapchain->GetDevice(__uuidof(IDXGIDevice), cast(void**, &dxgi_device)))) {
@@ -55,16 +63,88 @@ static void d3d11_init() {
     depthbuffer_state_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     depthbuffer_state_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
     hr = d3d11.device->CreateDepthStencilState(&depthbuffer_state_desc, &d3d11.depthbuffer_state);
-    if (FAILED(hr)) goto error;
+    if (FAILED(hr)) goto defer;
+
+    D3D11_BUFFER_DESC quad_vertex_buffer_desc = {};
+    quad_vertex_buffer_desc.ByteWidth = cast(u32, size_of(quad_vertices));
+    quad_vertex_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
+    quad_vertex_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    quad_vertex_buffer_desc.StructureByteStride = sizeof(Game_Quad_Vertex);
+    D3D11_SUBRESOURCE_DATA quad_vertex_buffer_data = {};
+    quad_vertex_buffer_data.pSysMem = quad_vertices;
+    hr = d3d11.device->CreateBuffer(&quad_vertex_buffer_desc, &quad_vertex_buffer_data, &d3d11.quad_vertex_buffer);
+    if (FAILED(hr)) goto defer;
+
+    D3D11_BUFFER_DESC quad_index_buffer_desc = {};
+    quad_index_buffer_desc.ByteWidth = cast(u32, size_of(quad_indices));
+    quad_index_buffer_desc.Usage = D3D11_USAGE_DEFAULT;
+    quad_index_buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    quad_index_buffer_desc.StructureByteStride = sizeof(quad_indices[0]);
+    D3D11_SUBRESOURCE_DATA quad_index_buffer_data = {};
+    quad_index_buffer_data.pSysMem = quad_indices;
+    hr = d3d11.device->CreateBuffer(&quad_index_buffer_desc, &quad_index_buffer_data, &d3d11.quad_index_buffer);
+    if (FAILED(hr)) goto defer;
+
+    string source =
+      "struct VInput {\n"
+      "  float3 position : Position;\n"
+      "  float2 texcoord : Texcoord;\n"
+      "};\n"
+      "struct VOutput {\n"
+      "  float4 position : SV_Position;\n"
+      "  float2 texcoord : Texcoord;\n"
+      "};\n"
+      "\n"
+      "VOutput vmain(VInput input) {\n"
+      "  VOutput output;\n"
+      "  output.position = float4(input.position, 1.0f);\n"
+      "  output.texcoord = input.texcoord;\n"
+      "  return output;\n"
+      "}\n"
+      "\n"
+      "float4 pmain(VOutput input) : SV_Target0 {\n"
+      "  return float4(input.texcoord, 0.0f, 1.0f);\n"
+      "}\n";
+
+    hr = D3DCompile(source.data, source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &vblob, nullptr);
+    if (FAILED(hr)) goto defer;
+
+    hr = D3DCompile(source.data, source.count, nullptr, nullptr, nullptr, "pmain", "ps_5_0", D3DCOMPILE_DEBUG, 0, &pblob, nullptr);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreateVertexShader(vblob->GetBufferPointer(), vblob->GetBufferSize(), nullptr, &d3d11.quad_vertex_shader);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreatePixelShader(pblob->GetBufferPointer(), pblob->GetBufferSize(), nullptr, &d3d11.quad_pixel_shader);
+    if (FAILED(hr)) goto defer;
+
+    D3D11_INPUT_ELEMENT_DESC input_layout_elements[2] = {};
+    input_layout_elements[0].SemanticName = "Position";
+    input_layout_elements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+    input_layout_elements[0].AlignedByteOffset = offset_of(Game_Quad_Vertex, position);
+    input_layout_elements[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    input_layout_elements[1].SemanticName = "Texcoord";
+    input_layout_elements[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+    input_layout_elements[1].AlignedByteOffset = offset_of(Game_Quad_Vertex, texcoord);
+    input_layout_elements[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    hr = d3d11.device->CreateInputLayout(input_layout_elements, cast(u32, len(input_layout_elements)), vblob->GetBufferPointer(), vblob->GetBufferSize(), &d3d11.quad_input_layout);
+    if (FAILED(hr)) goto defer;
 
     d3d11.initted = true;
-    return;
   }
-error:
-  d3d11_deinit();
+defer:
+  if (pblob) pblob->Release();
+  if (vblob) vblob->Release();
+  if (hr != 0) d3d11_deinit();
 }
 
 static void d3d11_deinit() {
+  if (d3d11.quad_input_layout) d3d11.quad_input_layout->Release();
+  if (d3d11.quad_pixel_shader) d3d11.quad_pixel_shader->Release();
+  if (d3d11.quad_vertex_shader) d3d11.quad_vertex_shader->Release();
+  if (d3d11.quad_index_buffer) d3d11.quad_index_buffer->Release();
+  if (d3d11.quad_vertex_buffer) d3d11.quad_vertex_buffer->Release();
+
   if (d3d11.depthbuffer_view) d3d11.depthbuffer_view->Release();
   if (d3d11.depthbuffer) d3d11.depthbuffer->Release();
   if (d3d11.backbuffer_view) d3d11.backbuffer_view->Release();
@@ -122,6 +202,21 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
   d3d11.ctx->OMSetDepthStencilState(d3d11.depthbuffer_state, 0);
+  d3d11.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  d3d11.ctx->IASetInputLayout(d3d11.quad_input_layout);
+  d3d11.ctx->VSSetShader(d3d11.quad_vertex_shader, nullptr, 0);
+  d3d11.ctx->PSSetShader(d3d11.quad_pixel_shader, nullptr, 0);
+  u32 stride = sizeof(Game_Quad_Vertex);
+  u32 offset = 0;
+  d3d11.ctx->IASetVertexBuffers(0, 1, &d3d11.quad_vertex_buffer, &stride, &offset);
+  d3d11.ctx->IASetIndexBuffer(d3d11.quad_index_buffer, DXGI_FORMAT_R16_UINT, 0);
+  d3d11.ctx->OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
+  D3D11_VIEWPORT viewport = {};
+  viewport.Width = platform_size[0];
+  viewport.Height = platform_size[1];
+  viewport.MaxDepth = 1.0f;
+  d3d11.ctx->RSSetViewports(1, &viewport);
+  d3d11.ctx->DrawIndexed(cast(u32, len(quad_indices)), 0, 0);
 
   d3d11.swapchain->Present(1, 0);
 }
