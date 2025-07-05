@@ -6,6 +6,12 @@
   #define OP_CPU_X64 0
 #endif
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+  #define OP_CPU_ARM64 1
+#else
+  #define OP_CPU_ARM64 0
+#endif
+
 #if defined(_WIN32) || defined(__WIN32__)
   #define OP_OS_WINDOWS 1
 #else
@@ -14,7 +20,7 @@
 
 #define cast(T, V) ((T) (V))
 
-#if OP_CPU_X64
+#if OP_CPU_X64 || OP_CPU_ARM64
   typedef signed char s8;
   typedef short s16;
   typedef int s32;
