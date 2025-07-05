@@ -57,6 +57,7 @@ enum WM_PAINT = 0x000F;
 enum WM_QUIT = 0x0012;
 enum WM_ERASEBKGND = 0x0014;
 enum WM_ACTIVATEAPP = 0x001C;
+enum WM_INPUT = 0x00FF;
 enum WM_KEYDOWN = 0x0100;
 enum WM_KEYUP = 0x0101;
 enum WM_SYSKEYDOWN = 0x0104;
@@ -76,6 +77,11 @@ enum VK_ESCAPE = 0x1B;
 enum VK_F4 = 0x73;
 enum VK_F10 = 0x79;
 enum VK_F11 = 0x7A;
+enum HID_USAGE_PAGE_GENERIC = 0x01;
+enum HID_USAGE_GENERIC_MOUSE = 0x02;
+enum RID_INPUT = 0x10000003;
+enum RIM_TYPEMOUSE = 0;
+enum MOUSE_MOVE_RELATIVE = 0x00;
 
 struct HDC__; alias HDC = HDC__*;
 struct HWND__; alias HWND = HWND__*;
@@ -133,6 +139,53 @@ struct MONITORINFO {
   RECT rcWork;
   u32 dwFlags;
 }
+struct RAWINPUTDEVICE {
+  u16 usUsagePage;
+  u16 usUsage;
+  u32 dwFlags;
+  HWND hwndTarget;
+}
+struct RAWINPUTHEADER {
+  u32 dwType;
+  u32 dwSize;
+  HANDLE hDevice;
+  usize wParam;
+}
+struct RAWMOUSE {
+  u16 usFlags;
+  union {
+    u32 ulButtons;
+    struct {
+      u16 usButtonFlags;
+      u16 usButtonData;
+    }
+  }
+  u32 ulRawButtons;
+  s32 lLastX;
+  s32 lLastY;
+  u32 ulExtraInformation;
+}
+struct RAWKEYBOARD {
+  u16 MakeCode;
+  u16 Flags;
+  u16 Reserved;
+  u16 VKey;
+  u32 Message;
+  u32 ExtraInformation;
+}
+struct RAWHID {
+  u32 dwSizeHid;
+  u32 dwCount;
+  u8* bRawData;
+}
+struct RAWINPUT {
+  RAWINPUTHEADER header;
+  union {
+    RAWMOUSE mouse;
+    RAWKEYBOARD keyboard;
+    RAWHID hid;
+  }
+}
 
 @foreign("user32") extern(Windows) s32 SetProcessDPIAware();
 @foreign("user32") extern(Windows) HICON LoadIconW(HINSTANCE, const(wchar)*);
@@ -155,6 +208,8 @@ struct MONITORINFO {
 @foreign("user32") extern(Windows) s32 SetWindowPos(HWND, HWND, s32, s32, s32, s32, u32);
 @foreign("user32") extern(Windows) HMONITOR MonitorFromWindow(HWND, u32);
 @foreign("user32") extern(Windows) s32 GetMonitorInfoW(HMONITOR, MONITORINFO*);
+@foreign("user32") extern(Windows) s32 RegisterRawInputDevices(const(RAWINPUTDEVICE)*, u32, u32);
+@foreign("user32") extern(Windows) u32 GetRawInputData(HANDLE, u32, void*, u32*, u32);
 
 // gdi32
 enum PFD_DOUBLEBUFFER = 0x00000001;

@@ -1,4 +1,5 @@
 import basic;
+import basic.maths;
 static import game;
 
 version (Windows) {
@@ -8,7 +9,9 @@ version (Windows) {
   __gshared HINSTANCE platform_hinstance;
   __gshared HWND platform_hwnd;
   __gshared HDC platform_hdc;
-  __gshared u16[2] platform_size;
+  __gshared Vector!(2, u16) platform_size;
+  __gshared Vector!(2, u16) platform_mouse;
+  __gshared Vector!(2, s32) platform_mouse_delta;
   __gshared platform_renderer = true ? &d3d11_renderer : &opengl_renderer;
   debug __gshared HANDLE platform_stdin;
   debug __gshared HANDLE platform_stdout;
@@ -76,6 +79,17 @@ version (Windows) {
     wndclass.style = CS_OWNDC;
     wndclass.lpfnWndProc = (hwnd, message, wParam, lParam) {
       switch (message) {
+        case WM_INPUT:
+          RAWINPUT raw_input = void;
+          u32 raw_input_size = RAWINPUT.sizeof;
+          GetRawInputData(cast(HANDLE) lParam, RID_INPUT, &raw_input, &raw_input_size, RAWINPUTHEADER.sizeof);
+
+          if (raw_input.header.dwType == RIM_TYPEMOUSE) {
+            if (raw_input.mouse.usFlags & MOUSE_MOVE_RELATIVE) {
+              platform_mouse_delta += [raw_input.mouse.lLastX, raw_input.mouse.lLastY];
+            }
+          }
+          return 0;
         case WM_PAINT:
           ValidateRect(hwnd, null);
           return 0;
@@ -98,6 +112,13 @@ version (Windows) {
           DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_mode, dark_mode.sizeof);
           s32 round_mode = DWMWCP_DONOTROUND;
           DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
+
+          RAWINPUTDEVICE[1] raw_inputs;
+          raw_inputs[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
+          raw_inputs[0].usUsage = HID_USAGE_GENERIC_MOUSE;
+          raw_inputs[0].dwFlags = 0;
+          raw_inputs[0].hwndTarget = hwnd;
+          RegisterRawInputDevices(raw_inputs.ptr, raw_inputs.length, raw_inputs[0].sizeof);
 
           platform_renderer.init_();
           return 0;
@@ -123,6 +144,8 @@ version (Windows) {
       null, null, platform_hinstance, null);
 
     main_loop: while (true) {
+      platform_mouse_delta = 0;
+
       MSG msg = void;
       while (PeekMessageW(&msg, null, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
@@ -152,8 +175,12 @@ version (Windows) {
         }
       }
 
+      game.Input game_input;
+      game_input.resolution = platform_size;
+      game_input.mouse = platform_mouse;
+      game_input.mouse_delta = platform_mouse_delta;
       game.Renderer game_renderer;
-      game.game_update_and_render(&game_renderer);
+      game.game_update_and_render(&game_input, &game_renderer);
       platform_renderer.present(&game_renderer);
 
       if (sleep_is_granular) {
