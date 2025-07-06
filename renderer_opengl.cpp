@@ -343,11 +343,14 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer->clear_color0);
 
+  m4 vp2d = m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f}) * m4_translate(-game_renderer->camera2d.position);
+
   static OpenGL_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
   for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
     Game_Quad_Instance* instance = game_renderer->quad_instances.data + i;
     quad_instances[quad_instances_count++].transform =
+      vp2d *
       m4_translate<true>(instance->transform.position) *
       m4_rotate_z<true>(instance->transform.rotation) *
       m4_scale({instance->transform.scale, 1.0f});

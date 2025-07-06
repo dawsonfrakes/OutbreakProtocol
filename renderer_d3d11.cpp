@@ -225,6 +225,8 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->ClearRenderTargetView(d3d11.backbuffer_view, game_renderer->clear_color0);
   d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
+  m4 vp2d = m4_translate(-game_renderer->camera2d.position) * m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f});
+
   static D3D11_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
   for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
@@ -232,7 +234,8 @@ static void d3d11_present(Game_Renderer* game_renderer) {
     quad_instances[quad_instances_count++].transform =
       m4_scale({instance->transform.scale, 1.0f}) *
       m4_rotate_z(instance->transform.rotation) *
-      m4_translate(instance->transform.position);
+      m4_translate(instance->transform.position) *
+      vp2d;
   }
 
   D3D11_MAPPED_SUBRESOURCE mapped;

@@ -154,7 +154,49 @@ struct v2 {
   constexpr v2(f32 x = 0.0f) : x(x), y(x) {}
   constexpr v2(f32 x, f32 y) : x(x), y(y) {}
   operator const f32*() const { return &x; }
+
+  v2 operator-() {
+    v2 result;
+    result.x = -x;
+    result.y = -y;
+    return result;
+  }
+
+  v2 operator+(v2 rhs) {
+    v2 result;
+    result.x = x + rhs.x;
+    result.y = y + rhs.y;
+    return result;
+  }
+
+  v2 operator-(v2 rhs) {
+    v2 result;
+    result.x = x - rhs.x;
+    result.y = y - rhs.y;
+    return result;
+  }
+
+  v2 operator*(v2 rhs) {
+    v2 result;
+    result.x = x * rhs.x;
+    result.y = y * rhs.y;
+    return result;
+  }
+
+  v2 operator/(v2 rhs) {
+    v2 result;
+    result.x = x / rhs.x;
+    result.y = y / rhs.y;
+    return result;
+  }
 };
+
+static v2 operator/(f32 lhs, v2 rhs) {
+  v2 result;
+  result.x = lhs / rhs.x;
+  result.y = lhs / rhs.y;
+  return result;
+}
 
 struct v3 {
   alignas(16) f32 x;
