@@ -49,6 +49,7 @@
   X(void, glFrontFace, u32) \
   X(void, glDepthFunc, u32) \
   X(void, glBlendFunc, u32, u32) \
+  X(void, glViewport, s32, s32, u32, u32) \
   X(void, glClearColor, f32, f32, f32, f32) \
   X(void, glClear, u32)
 
@@ -286,7 +287,7 @@ static void opengl_init() {
   glNamedBufferData(quad_ebo, size_of(quad_indices), quad_indices, GL_STATIC_DRAW);
 
   glCreateBuffers(1, &opengl.quad_ibo);
-  glNamedBufferData(opengl.quad_ibo, GAME_QUAD_INSTANCES_MAX * sizeof(OpenGL_Quad_Instance), nullptr, GL_DYNAMIC_DRAW);
+  glNamedBufferData(opengl.quad_ibo, type_of_field(Game_Renderer, quad_instances)::capacity * sizeof(OpenGL_Quad_Instance), nullptr, GL_DYNAMIC_DRAW);
 
   u32 vbo_binding = 0;
   u32 ibo_binding = 1;
@@ -342,13 +343,14 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer->clear_color0);
 
-  static OpenGL_Quad_Instance quad_instances[GAME_QUAD_INSTANCES_MAX];
+  static OpenGL_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
-  for (usize i = 0; i < len(game_quad_instances); i += 1) {
-    quad_instances[quad_instances_count++].transform = m4_translate<true>(game_quad_instances[i].position);
+  for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
+    quad_instances[quad_instances_count++].transform = m4_translate<true>(game_renderer->quad_instances[i].position);
   }
   glNamedBufferSubData(opengl.quad_ibo, 0, quad_instances_count * sizeof(OpenGL_Quad_Instance), quad_instances);
 
+  glViewport(0, 0, platform_size[0], platform_size[1]);
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
   glDepthFunc(GL_GEQUAL);
   glEnable(GL_DEPTH_TEST);

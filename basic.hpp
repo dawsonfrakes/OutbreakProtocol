@@ -1,5 +1,23 @@
 #define OP_DEBUG 1
 
+#if defined(_MSC_VER)
+  #define OP_COMPILER_MSVC 1
+#else
+  #define OP_COMPILER_MSVC 0
+#endif
+
+#if defined(__clang__)
+  #define OP_COMPILER_CLANG 1
+#else
+  #define OP_COMPILER_CLANG 0
+#endif
+
+#if !OP_COMPILER_CLANG && defined(__GNUC__)
+  #define OP_COMPILER_GCC 1
+#else
+  #define OP_COMPILER_GCC 0
+#endif
+
 #if defined(__x86_64__) || defined(_M_AMD64)
   #define OP_CPU_X64 1
 #else
@@ -25,7 +43,20 @@
 #endif
 
 #define cast(T, V) ((T) (V))
+#define type_of(X) decltype(X)
+#define type_of_field(T, F) type_of(declval<T>().F)
 #define offset_of(T, F) cast(usize, &(cast(T*, 0))->F)
+#define assert(...) platform_assert(__VA_ARGS__, #__VA_ARGS__);
+
+#if OP_COMPILER_MSVC
+  #define debug_break() __debugbreak()
+#elif OP_COMPILER_CLANG || OP_COMPILER_GCC
+  #if OP_CPU_X64
+    #define debug_break() __asm__("int3");
+  #elif OP_CPU_ARM64
+    #define debug_break() __asm__(".inst 0xE7F001F0");
+  #endif
+#endif
 
 #if OP_CPU_X64 || OP_CPU_ARM64
   typedef signed char s8;
@@ -44,11 +75,9 @@
 typedef float f32;
 typedef double f64;
 
-template <typename T, usize N> inline usize len(T (&x)[N]) { (void) x; return N; }
-template <typename T, usize N> inline usize size_of(T (&x)[N]) { (void) x; return sizeof(T) * N; }
-
-template <typename T, typename U> inline auto min(T x, U y) { return x < y ? x : y; }
-template <typename T, typename U> inline auto max(T x, U y) { return x > y ? x : y; }
+template <typename T, usize N> static usize len(T (&x)[N]) { (void) x; return N; }
+template <typename T, usize N> static usize size_of(T (&x)[N]) { (void) x; return sizeof(T) * N; }
+template <typename T> static T&& declval();
 
 #if OP_OS_WINDOWS
 extern "C" usize strlen(const char*);
@@ -64,6 +93,22 @@ struct string {
   string(const char* s) : count(strlen(s)), data(cast(char*, s)) {}
   template<usize N> string(const char (&s)[N]) : count(N - 1), data(cast(char*, s)) {}
 };
+
+static void platform_assert(bool cond, string message, string _expr, string file = __FILE__, int line = __LINE__);
+static void platform_assert(bool cond, string expr, string file = __FILE__, int line = __LINE__);
+
+template<usize N, typename T>
+struct Bounded_Array {
+  T data[N];
+  usize count;
+  static constexpr usize capacity = N;
+
+  T& operator[](usize index) { assert(index < N); return data[index]; }
+  void operator+=(T rhs) { assert(count < N); data[count++] = rhs; }
+};
+
+template <typename T, typename U> auto min(T x, U y) { return x < y ? x : y; }
+template <typename T, typename U> auto max(T x, U y) { return x > y ? x : y; }
 
 struct v2 {
   alignas(16) f32 x;

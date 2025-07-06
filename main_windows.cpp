@@ -28,6 +28,24 @@ static void platform_log(string s) {
   #endif
 }
 
+// static void platform_assert(bool cond, string message, string _expr, string file, int line) {
+//   (void) _expr; (void) line;
+//   if (!cond) {
+//     platform_log(file);
+//     platform_log(message);
+//     debug_break();
+//   }
+// }
+
+static void platform_assert(bool cond, string expr, string file, int line) {
+  (void) line;
+  if (!cond) {
+    platform_log(file);
+    platform_log(expr);
+    debug_break();
+  }
+}
+
 #include "renderer.cpp"
 
 static Platform_Renderer* platform_renderer = &d3d11_renderer;

@@ -91,7 +91,7 @@ static void d3d11_init() {
     if (FAILED(hr)) goto defer;
 
     D3D11_BUFFER_DESC quad_instance_buffer_desc = {};
-    quad_instance_buffer_desc.ByteWidth = GAME_QUAD_INSTANCES_MAX * sizeof(D3D11_Quad_Instance);
+    quad_instance_buffer_desc.ByteWidth = type_of_field(Game_Renderer, quad_instances)::capacity * sizeof(D3D11_Quad_Instance);
     quad_instance_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
     quad_instance_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     quad_instance_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -225,10 +225,10 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->ClearRenderTargetView(d3d11.backbuffer_view, game_renderer->clear_color0);
   d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
-  static D3D11_Quad_Instance quad_instances[GAME_QUAD_INSTANCES_MAX];
+  static D3D11_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
-  for (usize i = 0; i < len(game_quad_instances); i += 1) {
-    quad_instances[quad_instances_count++].transform = m4_translate(game_quad_instances[i].position);
+  for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
+    quad_instances[quad_instances_count++].transform = m4_translate(game_renderer->quad_instances[i].position);
   }
 
   D3D11_MAPPED_SUBRESOURCE mapped;
