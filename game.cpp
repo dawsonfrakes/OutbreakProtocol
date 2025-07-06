@@ -4,7 +4,7 @@ struct Game_Quad_Vertex {
 };
 
 struct Game_Quad_Instance {
-  v3 position;
+  xform transform;
 };
 
 static Game_Quad_Vertex quad_vertices[4] = {
@@ -23,8 +23,8 @@ struct Game_Renderer {
 static void game_update_and_render(Game_Renderer* renderer) {
   renderer->clear_color0 = {0.6f, 0.2f, 0.2f, 1.0f};
 
-  renderer->quad_instances += {{+0.5f, 0.0f, 0.0f}};
-  renderer->quad_instances += {{-0.5f, 0.0f, 0.0f}};
-  renderer->quad_instances += {{+0.0f, +0.5f, 0.0f}};
-  renderer->quad_instances += {{+0.0f, -0.5f, 0.0f}};
+  renderer->quad_instances += {{{-0.5, -0.5, 0.0f}}};
+  renderer->quad_instances += {{{+0.5, -0.5, 0.0f}}};
+  renderer->quad_instances += {{{+0.5, +0.5, 0.0f}}};
+  renderer->quad_instances += {{{-0.5, +0.5, 0.0f}}};
 }

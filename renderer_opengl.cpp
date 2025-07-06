@@ -346,7 +346,7 @@ static void opengl_present(Game_Renderer* game_renderer) {
   static OpenGL_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
   for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
-    quad_instances[quad_instances_count++].transform = m4_translate<true>(game_renderer->quad_instances[i].position);
+    quad_instances[quad_instances_count++].transform = m4_translate<true>(game_renderer->quad_instances[i].transform.position);
   }
   glNamedBufferSubData(opengl.quad_ibo, 0, quad_instances_count * sizeof(OpenGL_Quad_Instance), quad_instances);
 

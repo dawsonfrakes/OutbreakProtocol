@@ -228,7 +228,7 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   static D3D11_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
   for (usize i = 0; i < game_renderer->quad_instances.count; i += 1) {
-    quad_instances[quad_instances_count++].transform = m4_translate(game_renderer->quad_instances[i].position);
+    quad_instances[quad_instances_count++].transform = m4_translate(game_renderer->quad_instances[i].transform.position);
   }
 
   D3D11_MAPPED_SUBRESOURCE mapped;

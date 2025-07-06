@@ -131,7 +131,24 @@ struct v4 {
   f32 z;
   f32 w;
 
+  v4(f32 x = 0.0f) : x(x), y(x), z(x), w(x) {}
+  v4(f32 x, f32 y, f32 z, f32 w) : x(x), y(y), z(z), w(w) {}
   operator const f32*() const { return &x; }
+};
+
+struct q4 {
+  alignas(16) f32 w;
+  f32 x;
+  f32 y;
+  f32 z;
+
+  operator const f32*() const { return &w; }
+};
+
+struct xform {
+  v3 position;
+  q4 rotation;
+  v4 scale = 1.0f;
 };
 
 struct m4 {
