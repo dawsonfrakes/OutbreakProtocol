@@ -114,6 +114,8 @@ struct v2 {
   alignas(16) f32 x;
   f32 y;
 
+  constexpr v2(f32 x = 0.0f) : x(x), y(x) {}
+  constexpr v2(f32 x, f32 y) : x(x), y(y) {}
   operator const f32*() const { return &x; }
 };
 
@@ -122,6 +124,8 @@ struct v3 {
   f32 y;
   f32 z;
 
+  constexpr v3(f32 x = 0.0f) : x(x), y(x), z(x) {}
+  constexpr v3(f32 x, f32 y, f32 z) : x(x), y(y), z(z) {}
   operator const f32*() const { return &x; }
 };
 
@@ -131,8 +135,8 @@ struct v4 {
   f32 z;
   f32 w;
 
-  v4(f32 x = 0.0f) : x(x), y(x), z(x), w(x) {}
-  v4(f32 x, f32 y, f32 z, f32 w) : x(x), y(y), z(z), w(w) {}
+  constexpr v4(f32 x = 0.0f) : x(x), y(x), z(x), w(x) {}
+  constexpr v4(f32 x, f32 y, f32 z, f32 w) : x(x), y(y), z(z), w(w) {}
   operator const f32*() const { return &x; }
 };
 
@@ -145,7 +149,13 @@ struct q4 {
   operator const f32*() const { return &w; }
 };
 
-struct xform {
+struct x2 {
+  v3 position;
+  v2 scale = 1.0f;
+  f32 rotation;
+};
+
+struct x3 {
   v3 position;
   q4 rotation;
   v4 scale = 1.0f;

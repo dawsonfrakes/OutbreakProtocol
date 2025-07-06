@@ -4,7 +4,7 @@ struct Game_Quad_Vertex {
 };
 
 struct Game_Quad_Instance {
-  xform transform;
+  x2 transform;
 };
 
 static Game_Quad_Vertex quad_vertices[4] = {
