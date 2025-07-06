@@ -78,3 +78,26 @@ struct v4 {
 
   operator const f32*() const { return &x; }
 };
+
+struct m4 {
+  alignas(16) f32 elements[16];
+};
+
+template<bool row_major = false>
+static inline m4 m4_translate(v3 by) {
+  if (row_major) {
+    return m4{{
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      by.x, by.y, by.z, 1.0f,
+    }};
+  } else {
+    return m4{{
+      1.0f, 0.0f, 0.0f, by.x,
+      0.0f, 1.0f, 0.0f, by.y,
+      0.0f, 0.0f, 1.0f, by.z,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  }
+}

@@ -2,6 +2,10 @@
 #include <Dxgi.h>
 #include <D3Dcompiler.h>
 
+struct D3D11_Quad_Instance {
+  m4 transform;
+};
+
 static struct {
   bool initted;
 
@@ -17,6 +21,7 @@ static struct {
 
   ID3D11Buffer* quad_vertex_buffer;
   ID3D11Buffer* quad_index_buffer;
+  ID3D11Buffer* quad_instance_buffer;
   ID3D11VertexShader* quad_vertex_shader;
   ID3D11PixelShader* quad_pixel_shader;
   ID3D11InputLayout* quad_input_layout;
@@ -85,10 +90,20 @@ static void d3d11_init() {
     hr = d3d11.device->CreateBuffer(&quad_index_buffer_desc, &quad_index_buffer_data, &d3d11.quad_index_buffer);
     if (FAILED(hr)) goto defer;
 
+    D3D11_BUFFER_DESC quad_instance_buffer_desc = {};
+    quad_instance_buffer_desc.ByteWidth = GAME_QUAD_INSTANCES_MAX * sizeof(D3D11_Quad_Instance);
+    quad_instance_buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
+    quad_instance_buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    quad_instance_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    quad_instance_buffer_desc.StructureByteStride = sizeof(D3D11_Quad_Instance);
+    hr = d3d11.device->CreateBuffer(&quad_instance_buffer_desc, nullptr, &d3d11.quad_instance_buffer);
+    if (FAILED(hr)) goto defer;
+
     string source =
       "struct VInput {\n"
       "  float3 position : Position;\n"
       "  float2 texcoord : Texcoord;\n"
+      "  matrix transform : Transform;\n"
       "};\n"
       "struct VOutput {\n"
       "  float4 position : SV_Position;\n"
@@ -97,7 +112,7 @@ static void d3d11_init() {
       "\n"
       "VOutput vmain(VInput input) {\n"
       "  VOutput output;\n"
-      "  output.position = float4(input.position, 1.0f);\n"
+      "  output.position = mul(float4(input.position, 1.0f), input.transform);\n"
       "  output.texcoord = input.texcoord;\n"
       "  return output;\n"
       "}\n"
@@ -118,7 +133,7 @@ static void d3d11_init() {
     hr = d3d11.device->CreatePixelShader(pblob->GetBufferPointer(), pblob->GetBufferSize(), nullptr, &d3d11.quad_pixel_shader);
     if (FAILED(hr)) goto defer;
 
-    D3D11_INPUT_ELEMENT_DESC input_layout_elements[2] = {};
+    D3D11_INPUT_ELEMENT_DESC input_layout_elements[6] = {};
     input_layout_elements[0].SemanticName = "Position";
     input_layout_elements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
     input_layout_elements[0].AlignedByteOffset = offset_of(Game_Quad_Vertex, position);
@@ -127,6 +142,15 @@ static void d3d11_init() {
     input_layout_elements[1].Format = DXGI_FORMAT_R32G32_FLOAT;
     input_layout_elements[1].AlignedByteOffset = offset_of(Game_Quad_Vertex, texcoord);
     input_layout_elements[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    for (usize i = 2; i < 6; i += 1) {
+      input_layout_elements[i].SemanticName = "Transform";
+      input_layout_elements[i].SemanticIndex = cast(u32, i - 2);
+      input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+      input_layout_elements[i].InputSlot = 1;
+      input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+      input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
+      input_layout_elements[i].InstanceDataStepRate = 1;
+    }
     hr = d3d11.device->CreateInputLayout(input_layout_elements, cast(u32, len(input_layout_elements)), vblob->GetBufferPointer(), vblob->GetBufferSize(), &d3d11.quad_input_layout);
     if (FAILED(hr)) goto defer;
 
@@ -142,6 +166,7 @@ static void d3d11_deinit() {
   if (d3d11.quad_input_layout) d3d11.quad_input_layout->Release();
   if (d3d11.quad_pixel_shader) d3d11.quad_pixel_shader->Release();
   if (d3d11.quad_vertex_shader) d3d11.quad_vertex_shader->Release();
+  if (d3d11.quad_instance_buffer) d3d11.quad_instance_buffer->Release();
   if (d3d11.quad_index_buffer) d3d11.quad_index_buffer->Release();
   if (d3d11.quad_vertex_buffer) d3d11.quad_vertex_buffer->Release();
 
@@ -195,20 +220,33 @@ defer:
 }
 
 static void d3d11_present(Game_Renderer* game_renderer) {
-  (void) game_renderer;
   if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
 
   d3d11.ctx->ClearRenderTargetView(d3d11.backbuffer_view, game_renderer->clear_color0);
   d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
+
+  static D3D11_Quad_Instance quad_instances[GAME_QUAD_INSTANCES_MAX];
+  usize quad_instances_count = 0;
+  for (usize i = 0; i < len(game_quad_instances); i += 1) {
+    quad_instances[quad_instances_count++].transform = m4_translate(game_quad_instances[i].position);
+  }
+
+  D3D11_MAPPED_SUBRESOURCE mapped;
+  HRESULT hr = d3d11.ctx->Map(d3d11.quad_instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+  if (SUCCEEDED(hr)) {
+    memcpy(mapped.pData, quad_instances, quad_instances_count * sizeof(D3D11_Quad_Instance));
+    d3d11.ctx->Unmap(d3d11.quad_instance_buffer, 0);
+  }
 
   d3d11.ctx->OMSetDepthStencilState(d3d11.depthbuffer_state, 0);
   d3d11.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   d3d11.ctx->IASetInputLayout(d3d11.quad_input_layout);
   d3d11.ctx->VSSetShader(d3d11.quad_vertex_shader, nullptr, 0);
   d3d11.ctx->PSSetShader(d3d11.quad_pixel_shader, nullptr, 0);
-  u32 stride = sizeof(Game_Quad_Vertex);
-  u32 offset = 0;
-  d3d11.ctx->IASetVertexBuffers(0, 1, &d3d11.quad_vertex_buffer, &stride, &offset);
+  ID3D11Buffer* buffers[2] = {d3d11.quad_vertex_buffer, d3d11.quad_instance_buffer};
+  u32 strides[2] = {sizeof(Game_Quad_Vertex), sizeof(D3D11_Quad_Instance)};
+  u32 offsets[2] = {0, 0};
+  d3d11.ctx->IASetVertexBuffers(0, cast(u32, len(buffers)), buffers, strides, offsets);
   d3d11.ctx->IASetIndexBuffer(d3d11.quad_index_buffer, DXGI_FORMAT_R16_UINT, 0);
   d3d11.ctx->OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
   D3D11_VIEWPORT viewport = {};
@@ -216,7 +254,7 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   viewport.Height = platform_size[1];
   viewport.MaxDepth = 1.0f;
   d3d11.ctx->RSSetViewports(1, &viewport);
-  d3d11.ctx->DrawIndexed(cast(u32, len(quad_indices)), 0, 0);
+  d3d11.ctx->DrawIndexedInstanced(cast(u32, len(quad_indices)), cast(u32, quad_instances_count), 0, 0, 0);
 
   d3d11.swapchain->Present(1, 0);
 }

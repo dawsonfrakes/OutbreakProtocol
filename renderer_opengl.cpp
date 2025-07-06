@@ -89,6 +89,10 @@
   X(void, glBindFramebuffer, u32, u32) \
   X(void, glBindVertexArray, u32)
 
+// 3.1
+#define GL31_FUNCTIONS \
+  X(void, glDrawElementsInstanced, u32, u32, u32, const void*, u32)
+
 // 3.2
 #define GL_MAX_COLOR_TEXTURE_SAMPLES 0x910E
 #define GL_MAX_DEPTH_TEXTURE_SAMPLES 0x910F
@@ -113,13 +117,15 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
   X(void, glCreateRenderbuffers, u32, u32*) \
   X(void, glNamedRenderbufferStorageMultisample, u32, u32, u32, u32, u32) \
   X(void, glCreateVertexArrays, u32, u32*) \
-  X(void, glVertexArrayVertexBuffer, u32, u32, u32, ssize, u32) \
   X(void, glVertexArrayElementBuffer, u32, u32) \
+  X(void, glVertexArrayVertexBuffer, u32, u32, u32, ssize, u32) \
+  X(void, glVertexArrayBindingDivisor, u32, u32, u32) \
   X(void, glEnableVertexArrayAttrib, u32, u32) \
   X(void, glVertexArrayAttribBinding, u32, u32, u32) \
   X(void, glVertexArrayAttribFormat, u32, u32, s32, u32, bool, u32) \
   X(void, glCreateBuffers, u32, u32*) \
-  X(void, glNamedBufferData, u32, ssize, const void*, u32)
+  X(void, glNamedBufferData, u32, ssize, const void*, u32) \
+  X(void, glNamedBufferSubData, u32, ssize, ssize, const void*)
 
 #if OP_OS_WINDOWS
   #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -139,6 +145,7 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
   #define X(RET, NAME, ...) static RET (WINAPI* NAME)(__VA_ARGS__);
     GL20_FUNCTIONS
     GL30_FUNCTIONS
+    GL31_FUNCTIONS
     GL43_FUNCTIONS
     GL45_FUNCTIONS
   #undef X
@@ -173,6 +180,7 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
     #define X(RET, NAME, ...) NAME = cast(RET (WINAPI*)(__VA_ARGS__), wglGetProcAddress(#NAME));
       GL20_FUNCTIONS
       GL30_FUNCTIONS
+      GL31_FUNCTIONS
       GL43_FUNCTIONS
       GL45_FUNCTIONS
     #undef X
@@ -193,6 +201,10 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
   }
 #endif
 
+struct OpenGL_Quad_Instance {
+  m4 transform;
+};
+
 static struct {
   bool initted;
 
@@ -202,6 +214,7 @@ static struct {
 
   u32 quad_shader;
   u32 quad_vao;
+  u32 quad_ibo;
 } opengl;
 
 static void opengl_debug_proc(u32 source, u32 type, u32 id, u32 severity, u32 length, const char *message, const void *param) {
@@ -233,9 +246,10 @@ static void opengl_init() {
     "#version 450\n"
     "layout(location = 0) in vec3 a_position;\n"
     "layout(location = 1) in vec2 a_texcoord;\n"
+    "layout(location = 2) in mat4 i_transform;\n"
     "layout(location = 1) out vec2 f_texcoord;\n"
     "void main() {\n"
-    "  gl_Position = vec4(a_position, 1.0);\n"
+    "  gl_Position = i_transform * vec4(a_position, 1.0);\n"
     "  f_texcoord = a_texcoord;\n"
     "}\n";
     const char* vsrcs[1] = {vsrc.data};
@@ -271,11 +285,16 @@ static void opengl_init() {
   glCreateBuffers(1, &quad_ebo);
   glNamedBufferData(quad_ebo, size_of(quad_indices), quad_indices, GL_STATIC_DRAW);
 
+  glCreateBuffers(1, &opengl.quad_ibo);
+  glNamedBufferData(opengl.quad_ibo, GAME_QUAD_INSTANCES_MAX * sizeof(OpenGL_Quad_Instance), nullptr, GL_DYNAMIC_DRAW);
+
   u32 vbo_binding = 0;
+  u32 ibo_binding = 1;
   glCreateVertexArrays(1, &opengl.quad_vao);
-  glVertexArrayVertexBuffer(opengl.quad_vao, vbo_binding, quad_vbo, 0, sizeof(Game_Quad_Vertex));
   glVertexArrayElementBuffer(opengl.quad_vao, quad_ebo);
-  // REMEMBER(dfra): IBO DIVISOR!
+  glVertexArrayVertexBuffer(opengl.quad_vao, vbo_binding, quad_vbo, 0, sizeof(Game_Quad_Vertex));
+  glVertexArrayVertexBuffer(opengl.quad_vao, ibo_binding, opengl.quad_ibo, 0, sizeof(OpenGL_Quad_Instance));
+  glVertexArrayBindingDivisor(opengl.quad_vao, ibo_binding, 1);
 
   u32 position_attrib = 0;
   glEnableVertexArrayAttrib(opengl.quad_vao, position_attrib);
@@ -286,6 +305,12 @@ static void opengl_init() {
   glEnableVertexArrayAttrib(opengl.quad_vao, texcoord_attrib);
   glVertexArrayAttribBinding(opengl.quad_vao, texcoord_attrib, vbo_binding);
   glVertexArrayAttribFormat(opengl.quad_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Quad_Vertex, texcoord));
+
+  for (u32 i = 2; i < 6; i += 1) {
+    glEnableVertexArrayAttrib(opengl.quad_vao, i);
+    glVertexArrayAttribBinding(opengl.quad_vao, i, ibo_binding);
+    glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+  }
 
   opengl.initted = true;
 }
@@ -317,6 +342,13 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer->clear_color0);
 
+  static OpenGL_Quad_Instance quad_instances[GAME_QUAD_INSTANCES_MAX];
+  usize quad_instances_count = 0;
+  for (usize i = 0; i < len(game_quad_instances); i += 1) {
+    quad_instances[quad_instances_count++].transform = m4_translate<true>(game_quad_instances[i].position);
+  }
+  glNamedBufferSubData(opengl.quad_ibo, 0, quad_instances_count * sizeof(OpenGL_Quad_Instance), quad_instances);
+
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
   glDepthFunc(GL_GEQUAL);
   glEnable(GL_DEPTH_TEST);
@@ -324,7 +356,7 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glEnable(GL_CULL_FACE);
   glUseProgram(opengl.quad_shader);
   glBindVertexArray(opengl.quad_vao);
-  glDrawElements(GL_TRIANGLES, cast(u32, len(quad_indices)), GL_UNSIGNED_SHORT, cast(void*, 0));
+  glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(quad_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, quad_instances_count));
 
   #if OP_DEBUG
     glBindVertexArray(0);
