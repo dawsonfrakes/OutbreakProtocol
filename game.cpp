@@ -10,7 +10,7 @@ struct Game_Quad_Instance {
 struct Game_Mesh_Vertex {
   v3 position;
   v3 normal;
-  // v2 texcoord;
+  v2 texcoord;
 };
 
 enum struct Game_Mesh : u32 {
