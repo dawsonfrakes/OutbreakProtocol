@@ -110,6 +110,43 @@ struct Bounded_Array {
 template <typename T, typename U> auto min(T x, U y) { return x < y ? x : y; }
 template <typename T, typename U> auto max(T x, U y) { return x > y ? x : y; }
 
+static constexpr f32 TAU = 6.28318530717958647692f;
+
+static f32 fmod(f32 x, f32 y) {
+  assert(y != 0.0f);
+  s32 n = cast(s32, x / y);
+  return x - n * y;
+}
+
+static f32 wrap(f32 turns) {
+  turns = fmod(turns, 1.0f);
+  if (turns > 0.5f) turns -= 1.0f;
+  else if (turns < -0.5f) turns += 1.0f;
+  return turns;
+}
+
+static f32 sin(f32 turns, s32 terms = 6) {
+  f32 x = wrap(turns) * TAU;
+  f32 term = x;
+  f32 sum = term;
+  for (s32 n = 1; n < terms; ++n) {
+    term *= -x * x / ((2 * n) * (2 * n + 1));
+    sum += term;
+  }
+  return sum;
+}
+
+static f32 cos(f32 turns, s32 terms = 6) {
+  f32 x = wrap(turns) * TAU;
+  f32 term = 1.0f;
+  f32 sum = term;
+  for (s32 n = 1; n < terms; ++n) {
+    term *= -x * x / ((2 * n - 1) * (2 * n));
+    sum += term;
+  }
+  return sum;
+}
+
 struct v2 {
   alignas(16) f32 x;
   f32 y;
@@ -126,6 +163,7 @@ struct v3 {
 
   constexpr v3(f32 x = 0.0f) : x(x), y(x), z(x) {}
   constexpr v3(f32 x, f32 y, f32 z) : x(x), y(y), z(z) {}
+  constexpr v3(v2 xy, f32 z = 0.0f) : x(xy.x), y(xy.y), z(z) {}
   operator const f32*() const { return &x; }
 };
 
@@ -162,11 +200,20 @@ struct x3 {
 };
 
 struct m4 {
-  alignas(16) f32 elements[16];
+  alignas(16) f32 elements[16] = {};
+
+  m4 operator*(m4 b) {
+    m4 result = {};
+    for (s32 i = 0; i < 4; i += 1)
+    for (s32 j = 0; j < 4; j += 1)
+    for (s32 k = 0; k < 4; k += 1)
+      result.elements[i * 4 + j] += b.elements[i * 4 + k] * elements[k * 4 + j];
+    return result;
+  }
 };
 
 template<bool row_major = false>
-static inline m4 m4_translate(v3 by) {
+static m4 m4_translate(v3 by) {
   if (row_major) {
     return m4{{
       1.0f, 0.0f, 0.0f, 0.0f,
@@ -182,4 +229,34 @@ static inline m4 m4_translate(v3 by) {
       0.0f, 0.0f, 0.0f, 1.0f,
     }};
   }
+}
+
+template<bool row_major = false>
+static m4 m4_rotate_z(f32 turns) {
+  f32 c = cos(turns);
+  f32 s = sin(turns);
+  if (row_major) {
+    return m4{{
+      +c,     +s, 0.0f, 0.0f,
+      -s,     +c, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  } else {
+    return m4{{
+      +c,     -s, 0.0f, 0.0f,
+      +s,     +c, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  }
+}
+
+static m4 m4_scale(v3 by) {
+  return m4{{
+    by.x, 0.0f, 0.0f, 0.0f,
+    0.0f, by.y, 0.0f, 0.0f,
+    0.0f, 0.0f, by.z, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f,
+  }};
 }
