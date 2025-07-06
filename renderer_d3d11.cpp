@@ -18,9 +18,15 @@ static struct {
   ID3D11Device* device;
   ID3D11DeviceContext* ctx;
   ID3D11DepthStencilState* depthbuffer_state;
+  ID3D11VertexShader* fullscreen_vertex_shader;
+  ID3D11PixelShader* tonemap_pixel_shader;
+  ID3D11SamplerState* linear_sampler;
 
-  ID3D11RenderTargetView* backbuffer_view;
-
+  ID3D11RenderTargetView* swapchain_backbuffer_view;
+  ID3D11Texture2D* multisampled_backbuffer;
+  ID3D11RenderTargetView* multisampled_backbuffer_view;
+  ID3D11Texture2D* backbuffer;
+  ID3D11ShaderResourceView* backbuffer_view;
   ID3D11Texture2D* depthbuffer;
   ID3D11DepthStencilView* depthbuffer_view;
 
@@ -47,6 +53,8 @@ static void d3d11_init() {
   ID3DBlob* quad_pblob = nullptr;
   ID3DBlob* mesh_vblob = nullptr;
   ID3DBlob* mesh_pblob = nullptr;
+  ID3DBlob* fullscreen_vblob = nullptr;
+  ID3DBlob* fullscreen_pblob = nullptr;
   {
     DXGI_SWAP_CHAIN_DESC swapchain_descriptor = {};
     swapchain_descriptor.BufferDesc.Width = platform_size[0];
@@ -82,6 +90,59 @@ static void d3d11_init() {
     depthbuffer_state_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     depthbuffer_state_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
     hr = d3d11.device->CreateDepthStencilState(&depthbuffer_state_desc, &d3d11.depthbuffer_state);
+    if (FAILED(hr)) goto defer;
+
+    string fullscreen_shader_source =
+      "struct VS_OUTPUT {\n"
+      "  float4 Pos : SV_POSITION;\n"
+      "  float2 UV : TEXCOORD0;\n"
+      "};\n"
+      "VS_OUTPUT vmain(uint id : SV_VertexID) {\n"
+      "  VS_OUTPUT output;\n"
+      "  float2 pos = float2((id << 1) & 2, id & 2);\n"
+      "  output.Pos = float4(pos * float2(2.0, -2.0) + float2(-1.0, 1.0), 0, 1);\n"
+      "  output.UV = pos;\n"
+      "  return output;\n"
+      "}\n"
+      "float3 ACESFilm(float3 x) {\n"
+      "  float a = 2.51;\n"
+      "  float b = 0.03;\n"
+      "  float c = 2.43;\n"
+      "  float d = 0.59;\n"
+      "  float e = 0.14;\n"
+      "  return saturate((x * (a * x + b)) / (x * (c * x + d) + e));\n"
+      "}\n"
+      "Texture2D HDRTexture : register(t0);\n"
+      "SamplerState Sampler : register(s0);\n"
+      "float4 pmain(VS_OUTPUT input) : SV_Target {\n"
+      "  float3 hdrColor = HDRTexture.Sample(Sampler, input.UV).rgb;\n"
+      "  float exposure = 1.0;\n"
+      "  hdrColor *= exposure;\n"
+      "  // float3 tonemapped = ACESFilm(hdrColor);\n"
+      "  return float4(hdrColor, 1.0);\n"
+      "}\n";
+
+    hr = D3DCompile(fullscreen_shader_source.data, fullscreen_shader_source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &fullscreen_vblob, nullptr);
+    if (FAILED(hr)) goto defer;
+
+    hr = D3DCompile(fullscreen_shader_source.data, fullscreen_shader_source.count, nullptr, nullptr, nullptr, "pmain", "ps_5_0", D3DCOMPILE_DEBUG, 0, &fullscreen_pblob, nullptr);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreateVertexShader(fullscreen_vblob->GetBufferPointer(), fullscreen_vblob->GetBufferSize(), nullptr, &d3d11.fullscreen_vertex_shader);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreatePixelShader(fullscreen_pblob->GetBufferPointer(), fullscreen_pblob->GetBufferSize(), nullptr, &d3d11.tonemap_pixel_shader);
+    if (FAILED(hr)) goto defer;
+
+    D3D11_SAMPLER_DESC linear_sampler_desc = {};
+    linear_sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    linear_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linear_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linear_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linear_sampler_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    linear_sampler_desc.MinLOD = 0;
+    linear_sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+    hr = d3d11.device->CreateSamplerState(&linear_sampler_desc, &d3d11.linear_sampler);
     if (FAILED(hr)) goto defer;
 
     D3D11_BUFFER_DESC quad_vertex_buffer_desc = {};
@@ -262,6 +323,8 @@ static void d3d11_init() {
     d3d11.initted = true;
   }
 defer:
+  if (fullscreen_pblob) fullscreen_pblob->Release();
+  if (fullscreen_vblob) fullscreen_vblob->Release();
   if (mesh_pblob) mesh_pblob->Release();
   if (mesh_vblob) mesh_vblob->Release();
   if (quad_pblob) quad_pblob->Release();
@@ -287,7 +350,14 @@ static void d3d11_deinit() {
   if (d3d11.depthbuffer_view) d3d11.depthbuffer_view->Release();
   if (d3d11.depthbuffer) d3d11.depthbuffer->Release();
   if (d3d11.backbuffer_view) d3d11.backbuffer_view->Release();
+  if (d3d11.backbuffer) d3d11.backbuffer->Release();
+  if (d3d11.multisampled_backbuffer_view) d3d11.multisampled_backbuffer_view->Release();
+  if (d3d11.multisampled_backbuffer) d3d11.multisampled_backbuffer->Release();
+  if (d3d11.swapchain_backbuffer_view) d3d11.swapchain_backbuffer_view->Release();
 
+  if (d3d11.linear_sampler) d3d11.linear_sampler->Release();
+  if (d3d11.tonemap_pixel_shader) d3d11.tonemap_pixel_shader->Release();
+  if (d3d11.fullscreen_vertex_shader) d3d11.fullscreen_vertex_shader->Release();
   if (d3d11.depthbuffer_state) d3d11.depthbuffer_state->Release();
   if (d3d11.ctx) d3d11.ctx->Release();
   if (d3d11.device) d3d11.device->Release();
@@ -304,6 +374,10 @@ static void d3d11_resize() {
     if (d3d11.depthbuffer_view) d3d11.depthbuffer_view->Release();
     if (d3d11.depthbuffer) d3d11.depthbuffer->Release();
     if (d3d11.backbuffer_view) d3d11.backbuffer_view->Release();
+    if (d3d11.backbuffer) d3d11.backbuffer->Release();
+    if (d3d11.multisampled_backbuffer_view) d3d11.multisampled_backbuffer_view->Release();
+    if (d3d11.multisampled_backbuffer) d3d11.multisampled_backbuffer->Release();
+    if (d3d11.swapchain_backbuffer_view) d3d11.swapchain_backbuffer_view->Release();
 
     hr = d3d11.swapchain->ResizeBuffers(1, platform_size[0], platform_size[1], DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
     if (FAILED(hr)) goto defer;
@@ -311,15 +385,40 @@ static void d3d11_resize() {
     hr = d3d11.swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), cast(void**, &backbuffer));
     if (FAILED(hr)) goto defer;
 
-    hr = d3d11.device->CreateRenderTargetView(backbuffer, nullptr, &d3d11.backbuffer_view);
+    hr = d3d11.device->CreateRenderTargetView(backbuffer, nullptr, &d3d11.swapchain_backbuffer_view);
+    if (FAILED(hr)) goto defer;
+
+    D3D11_TEXTURE2D_DESC multisampled_backbuffer_desc = {};
+    multisampled_backbuffer_desc.Width = platform_size[0];
+    multisampled_backbuffer_desc.Height = platform_size[1];
+    multisampled_backbuffer_desc.MipLevels = 1;
+    multisampled_backbuffer_desc.ArraySize = 1;
+    multisampled_backbuffer_desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    multisampled_backbuffer_desc.SampleDesc.Count = 8;
+    multisampled_backbuffer_desc.Usage = D3D11_USAGE_DEFAULT;
+    multisampled_backbuffer_desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+    hr = d3d11.device->CreateTexture2D(&multisampled_backbuffer_desc, nullptr, &d3d11.multisampled_backbuffer);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreateRenderTargetView(d3d11.multisampled_backbuffer, nullptr, &d3d11.multisampled_backbuffer_view);
+    if (FAILED(hr)) goto defer;
+
+    D3D11_TEXTURE2D_DESC backbuffer_desc = multisampled_backbuffer_desc;
+    backbuffer_desc.SampleDesc.Count = 1;
+    backbuffer_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    hr = d3d11.device->CreateTexture2D(&backbuffer_desc, nullptr, &d3d11.backbuffer);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreateShaderResourceView(d3d11.backbuffer, nullptr, &d3d11.backbuffer_view);
     if (FAILED(hr)) goto defer;
 
     D3D11_TEXTURE2D_DESC depthbuffer_desc = {};
     depthbuffer_desc.Width = platform_size[0];
     depthbuffer_desc.Height = platform_size[1];
+    depthbuffer_desc.MipLevels = 1;
     depthbuffer_desc.ArraySize = 1;
     depthbuffer_desc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthbuffer_desc.SampleDesc.Count = 1;
+    depthbuffer_desc.SampleDesc.Count = 8;
     depthbuffer_desc.Usage = D3D11_USAGE_DEFAULT;
     depthbuffer_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     hr = d3d11.device->CreateTexture2D(&depthbuffer_desc, nullptr, &d3d11.depthbuffer);
@@ -336,7 +435,7 @@ defer:
 static void d3d11_present(Game_Renderer* game_renderer) {
   if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
 
-  d3d11.ctx->ClearRenderTargetView(d3d11.backbuffer_view, game_renderer->clear_color0);
+  d3d11.ctx->ClearRenderTargetView(d3d11.multisampled_backbuffer_view, game_renderer->clear_color0);
   d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
   m4 vp2d = m4_translate(-game_renderer->camera2d.position) * m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f});
@@ -385,14 +484,15 @@ static void d3d11_present(Game_Renderer* game_renderer) {
     d3d11.ctx->Unmap(d3d11.mesh_instance_buffer, 0);
   }
 
-  d3d11.ctx->OMSetDepthStencilState(d3d11.depthbuffer_state, 0);
-  d3d11.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  d3d11.ctx->OMSetRenderTargets(1, &d3d11.backbuffer_view, d3d11.depthbuffer_view);
   D3D11_VIEWPORT viewport = {};
   viewport.Width = platform_size[0];
   viewport.Height = platform_size[1];
   viewport.MaxDepth = 1.0f;
   d3d11.ctx->RSSetViewports(1, &viewport);
+
+  d3d11.ctx->OMSetDepthStencilState(d3d11.depthbuffer_state, 0);
+  d3d11.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  d3d11.ctx->OMSetRenderTargets(1, &d3d11.multisampled_backbuffer_view, d3d11.depthbuffer_view);
 
   d3d11.ctx->IASetInputLayout(d3d11.quad_input_layout);
   d3d11.ctx->VSSetShader(d3d11.quad_vertex_shader, nullptr, 0);
@@ -414,6 +514,17 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->IASetIndexBuffer(d3d11.mesh_index_buffer, DXGI_FORMAT_R16_UINT, 0);
   d3d11.ctx->DrawIndexedInstanced(cast(u32, len(cube_indices)), cast(u32, mesh_instances_count), 0, 0, 0);
 
+  d3d11.ctx->ResolveSubresource(d3d11.backbuffer, 0, d3d11.multisampled_backbuffer, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
+  d3d11.ctx->OMSetDepthStencilState(nullptr, 0);
+  d3d11.ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  d3d11.ctx->IASetInputLayout(nullptr);
+  d3d11.ctx->VSSetShader(d3d11.fullscreen_vertex_shader, nullptr, 0);
+  d3d11.ctx->PSSetShader(d3d11.tonemap_pixel_shader, nullptr, 0);
+  d3d11.ctx->OMSetRenderTargets(1, &d3d11.swapchain_backbuffer_view, nullptr);
+  d3d11.ctx->PSSetShaderResources(0, 1, &d3d11.backbuffer_view);
+  d3d11.ctx->PSSetSamplers(0, 1, &d3d11.linear_sampler);
+  d3d11.ctx->Draw(3, 0);
   d3d11.swapchain->Present(1, 0);
 }
 
