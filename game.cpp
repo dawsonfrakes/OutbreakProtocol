@@ -17,14 +17,31 @@ static u16 quad_indices[6] = {0, 1, 2, 2, 3, 0};
 
 struct Game_Mesh_Vertex {
   v3 position;
-  v3 normal;
-  v2 texcoord;
+  // v3 normal;
+  // v2 texcoord;
 };
 
 enum struct Game_Mesh : u32 {
   ERROR = 0,
   CUBE = 1,
   COUNT,
+};
+
+static Game_Mesh_Vertex cube_vertices[8] = {
+  {{-1.0f, -1.0f, -1.0f}},
+  {{-1.0f, -1.0f, +1.0f}},
+  {{-1.0f, +1.0f, -1.0f}},
+  {{-1.0f, +1.0f, +1.0f}},
+  {{+1.0f, -1.0f, -1.0f}},
+  {{+1.0f, -1.0f, +1.0f}},
+  {{+1.0f, +1.0f, -1.0f}},
+  {{+1.0f, +1.0f, +1.0f}},
+};
+static u16 cube_indices[12] = {
+  // front
+  0, 2, 6, 6, 4, 0,
+  // back
+  5, 7, 3, 3, 1, 5,
 };
 
 struct Game_Mesh_Instance {
@@ -65,6 +82,6 @@ static void game_update_and_render(Game_Renderer* renderer) {
   renderer->camera.z_near = 0.1f;
   renderer->camera.z_far = 5000.0f;
 
-  renderer->quad_instances += {{{-200, +0.5, 0.0f}, 100.0f}};
-  renderer->mesh_instances += {{}, Game_Mesh::CUBE};
+  renderer->quad_instances += {{{-200, +0.5, 0.0f}, 0.0f, 100.0f}};
+  renderer->mesh_instances += {{5.0f, q4_from_euler(0.0f), 1.0f}, Game_Mesh::CUBE};
 }

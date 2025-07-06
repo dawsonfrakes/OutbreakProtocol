@@ -206,6 +206,11 @@ struct OpenGL_Quad_Instance {
   m4 transform;
 };
 
+struct OpenGL_Mesh_Instance {
+  m4 transform;
+  Game_Mesh mesh_index;
+};
+
 static struct {
   bool initted;
 
@@ -216,6 +221,10 @@ static struct {
   u32 quad_shader;
   u32 quad_vao;
   u32 quad_ibo;
+
+  u32 mesh_shader;
+  u32 mesh_vao;
+  u32 mesh_ibo;
 } opengl;
 
 static void opengl_debug_proc(u32 source, u32 type, u32 id, u32 severity, u32 length, const char *message, const void *param) {
@@ -276,41 +285,103 @@ static void opengl_init() {
     glLinkProgram(opengl.quad_shader);
     glDetachShader(opengl.quad_shader, fshader);
     glDetachShader(opengl.quad_shader, vshader);
+
+    u32 quad_vbo;
+    glCreateBuffers(1, &quad_vbo);
+    glNamedBufferData(quad_vbo, size_of(quad_vertices), quad_vertices, GL_STATIC_DRAW);
+
+    u32 quad_ebo;
+    glCreateBuffers(1, &quad_ebo);
+    glNamedBufferData(quad_ebo, size_of(quad_indices), quad_indices, GL_STATIC_DRAW);
+
+    glCreateBuffers(1, &opengl.quad_ibo);
+    glNamedBufferData(opengl.quad_ibo, type_of_field(Game_Renderer, quad_instances)::capacity * sizeof(OpenGL_Quad_Instance), nullptr, GL_DYNAMIC_DRAW);
+
+    u32 vbo_binding = 0;
+    u32 ibo_binding = 1;
+    glCreateVertexArrays(1, &opengl.quad_vao);
+    glVertexArrayElementBuffer(opengl.quad_vao, quad_ebo);
+    glVertexArrayVertexBuffer(opengl.quad_vao, vbo_binding, quad_vbo, 0, sizeof(Game_Quad_Vertex));
+    glVertexArrayVertexBuffer(opengl.quad_vao, ibo_binding, opengl.quad_ibo, 0, sizeof(OpenGL_Quad_Instance));
+    glVertexArrayBindingDivisor(opengl.quad_vao, ibo_binding, 1);
+
+    u32 position_attrib = 0;
+    glEnableVertexArrayAttrib(opengl.quad_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.quad_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.quad_vao, position_attrib, 3, GL_FLOAT, false, offset_of(Game_Quad_Vertex, position));
+
+    u32 texcoord_attrib = 1;
+    glEnableVertexArrayAttrib(opengl.quad_vao, texcoord_attrib);
+    glVertexArrayAttribBinding(opengl.quad_vao, texcoord_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.quad_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Quad_Vertex, texcoord));
+
+    for (u32 i = 2; i < 6; i += 1) {
+      glEnableVertexArrayAttrib(opengl.quad_vao, i);
+      glVertexArrayAttribBinding(opengl.quad_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+    }
   }
 
-  u32 quad_vbo;
-  glCreateBuffers(1, &quad_vbo);
-  glNamedBufferData(quad_vbo, size_of(quad_vertices), quad_vertices, GL_STATIC_DRAW);
+  {
+    string vsrc =
+    "#version 450\n"
+    "layout(location = 0) in vec3 a_position;\n"
+    "layout(location = 1) in mat4 i_transform;\n"
+    "void main() {\n"
+    "  gl_Position = i_transform * vec4(a_position, 1.0);\n"
+    "}\n";
+    const char* vsrcs[1] = {vsrc.data};
+    u32 vshader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vshader, 1, vsrcs, nullptr);
+    glCompileShader(vshader);
 
-  u32 quad_ebo;
-  glCreateBuffers(1, &quad_ebo);
-  glNamedBufferData(quad_ebo, size_of(quad_indices), quad_indices, GL_STATIC_DRAW);
+    string fsrc =
+    "#version 450\n"
+    "layout(location = 0) out vec4 color;\n"
+    "void main() {\n"
+    "  color = vec4(1.0, 1.0, 1.0, 1.0);\n"
+    "}\n";
+    const char* fsrcs[1] = {fsrc.data};
+    u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fshader, 1, fsrcs, nullptr);
+    glCompileShader(fshader);
 
-  glCreateBuffers(1, &opengl.quad_ibo);
-  glNamedBufferData(opengl.quad_ibo, type_of_field(Game_Renderer, quad_instances)::capacity * sizeof(OpenGL_Quad_Instance), nullptr, GL_DYNAMIC_DRAW);
+    opengl.mesh_shader = glCreateProgram();
+    glAttachShader(opengl.mesh_shader, vshader);
+    glAttachShader(opengl.mesh_shader, fshader);
+    glLinkProgram(opengl.mesh_shader);
+    glDetachShader(opengl.mesh_shader, fshader);
+    glDetachShader(opengl.mesh_shader, vshader);
 
-  u32 vbo_binding = 0;
-  u32 ibo_binding = 1;
-  glCreateVertexArrays(1, &opengl.quad_vao);
-  glVertexArrayElementBuffer(opengl.quad_vao, quad_ebo);
-  glVertexArrayVertexBuffer(opengl.quad_vao, vbo_binding, quad_vbo, 0, sizeof(Game_Quad_Vertex));
-  glVertexArrayVertexBuffer(opengl.quad_vao, ibo_binding, opengl.quad_ibo, 0, sizeof(OpenGL_Quad_Instance));
-  glVertexArrayBindingDivisor(opengl.quad_vao, ibo_binding, 1);
+    u32 mesh_vbo;
+    glCreateBuffers(1, &mesh_vbo);
+    glNamedBufferData(mesh_vbo, size_of(cube_vertices), cube_vertices, GL_STATIC_DRAW);
 
-  u32 position_attrib = 0;
-  glEnableVertexArrayAttrib(opengl.quad_vao, position_attrib);
-  glVertexArrayAttribBinding(opengl.quad_vao, position_attrib, vbo_binding);
-  glVertexArrayAttribFormat(opengl.quad_vao, position_attrib, 3, GL_FLOAT, false, offset_of(Game_Quad_Vertex, position));
+    u32 mesh_ebo;
+    glCreateBuffers(1, &mesh_ebo);
+    glNamedBufferData(mesh_ebo, size_of(cube_indices), cube_indices, GL_STATIC_DRAW);
 
-  u32 texcoord_attrib = 1;
-  glEnableVertexArrayAttrib(opengl.quad_vao, texcoord_attrib);
-  glVertexArrayAttribBinding(opengl.quad_vao, texcoord_attrib, vbo_binding);
-  glVertexArrayAttribFormat(opengl.quad_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Quad_Vertex, texcoord));
+    glCreateBuffers(1, &opengl.mesh_ibo);
+    glNamedBufferData(opengl.mesh_ibo, type_of_field(Game_Renderer, mesh_instances)::capacity * sizeof(OpenGL_Mesh_Instance), nullptr, GL_DYNAMIC_DRAW);
 
-  for (u32 i = 2; i < 6; i += 1) {
-    glEnableVertexArrayAttrib(opengl.quad_vao, i);
-    glVertexArrayAttribBinding(opengl.quad_vao, i, ibo_binding);
-    glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+    u32 vbo_binding = 0;
+    u32 ibo_binding = 1;
+    glCreateVertexArrays(1, &opengl.mesh_vao);
+    glVertexArrayElementBuffer(opengl.mesh_vao, mesh_ebo);
+    glVertexArrayVertexBuffer(opengl.mesh_vao, vbo_binding, mesh_vbo, 0, sizeof(Game_Mesh_Vertex));
+    glVertexArrayVertexBuffer(opengl.mesh_vao, ibo_binding, opengl.mesh_ibo, 0, sizeof(OpenGL_Mesh_Instance));
+    glVertexArrayBindingDivisor(opengl.mesh_vao, ibo_binding, 1);
+
+    u32 position_attrib = 0;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.mesh_vao, position_attrib, 3, GL_FLOAT, false, offset_of(Game_Mesh_Vertex, position));
+
+    for (u32 i = 1; i < 5; i += 1) {
+      glEnableVertexArrayAttrib(opengl.mesh_vao, i);
+      glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - 1) * sizeof(v4));
+    }
   }
 
   opengl.initted = true;
@@ -343,7 +414,7 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer->clear_color0);
 
-  m4 vp2d = m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f}) * m4_translate(-game_renderer->camera2d.position);
+  m4 vp2d = m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f}) * m4_translate<true>(-game_renderer->camera2d.position);
 
   static OpenGL_Quad_Instance quad_instances[type_of_field(Game_Renderer, quad_instances)::capacity];
   usize quad_instances_count = 0;
@@ -357,15 +428,37 @@ static void opengl_present(Game_Renderer* game_renderer) {
   }
   glNamedBufferSubData(opengl.quad_ibo, 0, quad_instances_count * sizeof(OpenGL_Quad_Instance), quad_instances);
 
+  m4 vp3d = m4_perspective<true>(game_renderer->camera.fov_y,
+    game_renderer->camera.aspect_ratio,
+    game_renderer->camera.z_near,
+    game_renderer->camera.z_far) * m4_translate<true>(-game_renderer->camera.position);
+
+  static OpenGL_Mesh_Instance mesh_instances[type_of_field(Game_Renderer, mesh_instances)::capacity];
+  usize mesh_instances_count = 0;
+  for (usize i = 0; i < game_renderer->mesh_instances.count; i += 1) {
+    Game_Mesh_Instance* instance = game_renderer->mesh_instances.data + i;
+    mesh_instances[mesh_instances_count++].transform =
+      vp3d *
+      m4_translate<true>(instance->transform.position) *
+      m4_from_q4<true>(instance->transform.rotation) *
+      m4_scale(instance->transform.scale);
+  }
+  glNamedBufferSubData(opengl.mesh_ibo, 0, mesh_instances_count * sizeof(OpenGL_Mesh_Instance), mesh_instances);
+
   glViewport(0, 0, platform_size[0], platform_size[1]);
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
   glDepthFunc(GL_GEQUAL);
   glEnable(GL_DEPTH_TEST);
   glFrontFace(GL_CW);
   glEnable(GL_CULL_FACE);
+
   glUseProgram(opengl.quad_shader);
   glBindVertexArray(opengl.quad_vao);
   glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(quad_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, quad_instances_count));
+
+  glUseProgram(opengl.mesh_shader);
+  glBindVertexArray(opengl.mesh_vao);
+  glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(cube_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, mesh_instances_count));
 
   #if OP_DEBUG
     glBindVertexArray(0);

@@ -75,9 +75,9 @@
 typedef float f32;
 typedef double f64;
 
-template <typename T, usize N> static usize len(T (&x)[N]) { (void) x; return N; }
-template <typename T, usize N> static usize size_of(T (&x)[N]) { (void) x; return sizeof(T) * N; }
-template <typename T> static T&& declval();
+template <typename T, usize N> constexpr static usize len(T (&x)[N]) { (void) x; return N; }
+template <typename T, usize N> constexpr static usize size_of(T (&x)[N]) { (void) x; return sizeof(T) * N; }
+template <typename T> constexpr static T&& declval();
 
 #if OP_OS_WINDOWS
 extern "C" usize strlen(const char*);
@@ -147,6 +147,10 @@ static f32 cos(f32 turns, s32 terms = 6) {
   return sum;
 }
 
+static f32 tan(f32 turns, s32 terms = 6) {
+  return sin(turns, terms) / cos(turns, terms);
+}
+
 struct v2 {
   alignas(16) f32 x;
   f32 y;
@@ -207,7 +211,55 @@ struct v3 {
   constexpr v3(f32 x, f32 y, f32 z) : x(x), y(y), z(z) {}
   constexpr v3(v2 xy, f32 z = 0.0f) : x(xy.x), y(xy.y), z(z) {}
   operator const f32*() const { return &x; }
+
+  v3 operator-() {
+    v3 result;
+    result.x = -x;
+    result.y = -y;
+    result.z = -z;
+    return result;
+  }
+
+  v3 operator+(v3 rhs) {
+    v3 result;
+    result.x = x + rhs.x;
+    result.y = y + rhs.y;
+    result.z = z + rhs.z;
+    return result;
+  }
+
+  v3 operator-(v3 rhs) {
+    v3 result;
+    result.x = x - rhs.x;
+    result.y = y - rhs.y;
+    result.z = z - rhs.z;
+    return result;
+  }
+
+  v3 operator*(v3 rhs) {
+    v3 result;
+    result.x = x * rhs.x;
+    result.y = y * rhs.y;
+    result.z = z * rhs.z;
+    return result;
+  }
+
+  v3 operator/(v3 rhs) {
+    v3 result;
+    result.x = x / rhs.x;
+    result.y = y / rhs.y;
+    result.z = z / rhs.z;
+    return result;
+  }
 };
+
+// static v3 operator/(f32 lhs, v3 rhs) {
+//   v3 result;
+//   result.x = lhs / rhs.x;
+//   result.y = lhs / rhs.y;
+//   result.z = lhs / rhs.z;
+//   return result;
+// }
 
 struct v4 {
   alignas(16) f32 x;
@@ -229,16 +281,32 @@ struct q4 {
   operator const f32*() const { return &w; }
 };
 
+static q4 q4_from_euler(v3 euler) {
+  f32 cy = cos(euler.y * 0.5f);
+  f32 sy = sin(euler.y * 0.5f);
+  f32 cp = cos(euler.x * 0.5f);
+  f32 sp = sin(euler.x * 0.5f);
+  f32 cr = cos(euler.z * 0.5f);
+  f32 sr = sin(euler.z * 0.5f);
+
+  q4 q;
+  q.w = cy * cp * cr + sy * sp * sr;
+  q.x = cy * sp * cr + sy * cp * sr;
+  q.y = sy * cp * cr - cy * sp * sr;
+  q.z = cy * cp * sr - sy * sp * cr;
+  return q;
+}
+
 struct x2 {
   v3 position;
-  v2 scale = 1.0f;
   f32 rotation;
+  v2 scale = 1.0f;
 };
 
 struct x3 {
   v3 position;
   q4 rotation;
-  v4 scale = 1.0f;
+  v3 scale = 1.0f;
 };
 
 struct m4 {
@@ -301,4 +369,57 @@ static m4 m4_scale(v3 by) {
     0.0f, 0.0f, by.z, 0.0f,
     0.0f, 0.0f, 0.0f, 1.0f,
   }};
+}
+
+template<bool row_major = false>
+static m4 m4_perspective(f32 fov_y, f32 aspect_ratio, f32 z_near, f32 z_far) {
+  f32 f = 1.0f / tan(fov_y * 0.5f);
+  f32 a = f / aspect_ratio;
+  f32 b = f;
+  f32 c = z_far / (z_far - z_near);
+  f32 d = -(z_far * z_near) / (z_far - z_near);
+  if (row_major) {
+    return m4{{
+      a, 0.0f, 0.0f, 0.0f,
+      0.0f, b, 0.0f, 0.0f,
+      0.0f, 0.0f, c, 1.0f,
+      0.0f, 0.0f, d, 0.0f,
+    }};
+  } else {
+    return m4{{
+      a, 0.0f, 0.0f, 0.0f,
+      0.0f, b, 0.0f, 0.0f,
+      0.0f, 0.0f, c, d,
+      0.0f, 0.0f, 1.0f, 0.0f,
+    }};
+  }
+}
+
+template<bool row_major = false>
+static m4 m4_from_q4(q4 q) {
+  f32 xx = q.x * q.x;
+  f32 yy = q.y * q.y;
+  f32 zz = q.z * q.z;
+  f32 xy = q.x * q.y;
+  f32 xz = q.x * q.z;
+  f32 yz = q.y * q.z;
+  f32 wx = q.w * q.x;
+  f32 wy = q.w * q.y;
+  f32 wz = q.w * q.z;
+
+  if (row_major) {
+    return m4{{
+      1.0f - 2.0f * (yy + zz), 2.0f * (xy - wz),        2.0f * (xz + wy),        0.0f,
+      2.0f * (xy + wz),        1.0f - 2.0f * (xx + zz), 2.0f * (yz - wx),        0.0f,
+      2.0f * (xz - wy),        2.0f * (yz + wx),        1.0f - 2.0f * (xx + yy), 0.0f,
+      0.0f,                    0.0f,                    0.0f,                    1.0f,
+    }};
+  } else {
+    return m4{{
+      1.0f - 2.0f * (yy + zz), 2.0f * (xy + wz),        2.0f * (xz - wy),        0.0f,
+      2.0f * (xy - wz),        1.0f - 2.0f * (xx + zz), 2.0f * (yz + wx),        0.0f,
+      2.0f * (xz + wy),        2.0f * (yz - wx),        1.0f - 2.0f * (xx + yy), 0.0f,
+      0.0f,                    0.0f,                    0.0f,                    1.0f,
+    }};
+  }
 }
