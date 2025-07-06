@@ -367,7 +367,7 @@ static void d3d11_deinit() {
 
 static void d3d11_resize() {
   HRESULT hr = 0;
-  ID3D11Texture2D* backbuffer = nullptr;
+  ID3D11Texture2D* swapchain_backbuffer = nullptr;
   {
     if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
 
@@ -382,10 +382,10 @@ static void d3d11_resize() {
     hr = d3d11.swapchain->ResizeBuffers(1, platform_size[0], platform_size[1], DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
     if (FAILED(hr)) goto defer;
 
-    hr = d3d11.swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), cast(void**, &backbuffer));
+    hr = d3d11.swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), cast(void**, &swapchain_backbuffer));
     if (FAILED(hr)) goto defer;
 
-    hr = d3d11.device->CreateRenderTargetView(backbuffer, nullptr, &d3d11.swapchain_backbuffer_view);
+    hr = d3d11.device->CreateRenderTargetView(swapchain_backbuffer, nullptr, &d3d11.swapchain_backbuffer_view);
     if (FAILED(hr)) goto defer;
 
     D3D11_TEXTURE2D_DESC multisampled_backbuffer_desc = {};
@@ -428,7 +428,7 @@ static void d3d11_resize() {
     if (FAILED(hr)) goto defer;
   }
 defer:
-  if (backbuffer) backbuffer->Release();
+  if (swapchain_backbuffer) swapchain_backbuffer->Release();
   if (hr != 0) d3d11_deinit();
 }
 

@@ -63,6 +63,12 @@ static void game_update_and_render(Game_Renderer* renderer) {
   renderer->camera.z_near = 0.1f;
   renderer->camera.z_far = 5000.0f;
 
-  renderer->quad_instances += {{{-200, +0.5, 0.0f}, 0.0f, 100.0f}};
-  renderer->mesh_instances += {{5.0f, q4_from_euler({rr, rr, 0.0f}), 1.0f}, Game_Mesh::CUBE};
+  renderer->quad_instances += {{{-200, +0.5, 1.0f}, 0.0f, 100.0f}};
+  u32 i = 0;
+  for (f32 x = -5.0f; x <= 5.0f; x += 5.0f) {
+  for (f32 y = -5.0f; y <= 5.0f; y += 5.0f) {
+    renderer->mesh_instances += {{{x, y, 5.0f}, q4_from_euler({rr * (i % 2 == 0 ? 1 : -1), -rr, 0.0f}), 1.0f}, Game_Mesh::CUBE};
+    i += 1;
+  }
+  }
 }
