@@ -200,20 +200,23 @@ static void d3d11_init() {
     string mesh_shader_source =
       "struct VInput {\n"
       "  float3 position : Position;\n"
+      "  float3 normal : Normal;\n"
       "  matrix transform : Transform;\n"
       "};\n"
       "struct VOutput {\n"
       "  float4 position : SV_Position;\n"
+      "  float3 normal : Normal;\n"
       "};\n"
       "\n"
       "VOutput vmain(VInput input) {\n"
       "  VOutput output;\n"
       "  output.position = mul(float4(input.position, 1.0f), input.transform);\n"
+      "  output.normal = input.normal;\n"
       "  return output;\n"
       "}\n"
       "\n"
       "float4 pmain(VOutput input) : SV_Target0 {\n"
-      "  return float4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+      "  return float4(abs(input.normal), 1.0f);\n"
       "}\n";
 
     hr = D3DCompile(mesh_shader_source.data, mesh_shader_source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &mesh_vblob, nullptr);
@@ -228,17 +231,21 @@ static void d3d11_init() {
     hr = d3d11.device->CreatePixelShader(mesh_pblob->GetBufferPointer(), mesh_pblob->GetBufferSize(), nullptr, &d3d11.mesh_pixel_shader);
     if (FAILED(hr)) goto defer;
 
-    D3D11_INPUT_ELEMENT_DESC mesh_input_layout_elements[5] = {};
+    D3D11_INPUT_ELEMENT_DESC mesh_input_layout_elements[6] = {};
     mesh_input_layout_elements[0].SemanticName = "Position";
     mesh_input_layout_elements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
     mesh_input_layout_elements[0].AlignedByteOffset = offset_of(Game_Mesh_Vertex, position);
     mesh_input_layout_elements[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-    for (usize i = 1; i < 5; i += 1) {
+    mesh_input_layout_elements[1].SemanticName = "Normal";
+    mesh_input_layout_elements[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+    mesh_input_layout_elements[1].AlignedByteOffset = offset_of(Game_Mesh_Vertex, normal);
+    mesh_input_layout_elements[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    for (usize i = 2; i < 6; i += 1) {
       mesh_input_layout_elements[i].SemanticName = "Transform";
-      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - 1);
+      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - 2);
       mesh_input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
       mesh_input_layout_elements[i].InputSlot = 1;
-      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, transform) + (i - 1) * sizeof(v4));
+      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, transform) + (i - 2) * sizeof(v4));
       mesh_input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
       mesh_input_layout_elements[i].InstanceDataStepRate = 1;
     }

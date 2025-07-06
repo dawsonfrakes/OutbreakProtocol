@@ -326,9 +326,12 @@ static void opengl_init() {
     string vsrc =
     "#version 450\n"
     "layout(location = 0) in vec3 a_position;\n"
-    "layout(location = 1) in mat4 i_transform;\n"
+    "layout(location = 1) in vec3 a_normal;\n"
+    "layout(location = 2) in mat4 i_transform;\n"
+    "layout(location = 1) out vec3 f_normal;\n"
     "void main() {\n"
     "  gl_Position = i_transform * vec4(a_position, 1.0);\n"
+    "  f_normal = a_normal;\n"
     "}\n";
     const char* vsrcs[1] = {vsrc.data};
     u32 vshader = glCreateShader(GL_VERTEX_SHADER);
@@ -337,9 +340,10 @@ static void opengl_init() {
 
     string fsrc =
     "#version 450\n"
+    "layout(location = 1) in vec3 f_normal;\n"
     "layout(location = 0) out vec4 color;\n"
     "void main() {\n"
-    "  color = vec4(1.0, 1.0, 1.0, 1.0);\n"
+    "  color = vec4(abs(f_normal), 1.0);\n"
     "}\n";
     const char* fsrcs[1] = {fsrc.data};
     u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -377,10 +381,15 @@ static void opengl_init() {
     glVertexArrayAttribBinding(opengl.mesh_vao, position_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.mesh_vao, position_attrib, 3, GL_FLOAT, false, offset_of(Game_Mesh_Vertex, position));
 
-    for (u32 i = 1; i < 5; i += 1) {
+    u32 normal_attrib = 1;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, normal_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, normal_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.mesh_vao, normal_attrib, 3, GL_FLOAT, false, offset_of(Game_Mesh_Vertex, normal));
+
+    for (u32 i = 2; i < 6; i += 1) {
       glEnableVertexArrayAttrib(opengl.mesh_vao, i);
       glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - 1) * sizeof(v4));
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - 2) * sizeof(v4));
     }
   }
 
