@@ -18,6 +18,12 @@
   #define OP_OS_WINDOWS 0
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+  #define OP_OS_MACOS 1
+#else
+  #define OP_OS_MACOS 0
+#endif
+
 #define cast(T, V) ((T) (V))
 #define offset_of(T, F) cast(usize, &(cast(T*, 0))->F)
 
@@ -44,7 +50,11 @@ template <typename T, usize N> inline usize size_of(T (&x)[N]) { (void) x; retur
 template <typename T, typename U> inline auto min(T x, U y) { return x < y ? x : y; }
 template <typename T, typename U> inline auto max(T x, U y) { return x > y ? x : y; }
 
+#if OP_OS_WINDOWS
 extern "C" usize strlen(const char*);
+#elif OP_OS_MACOS
+extern "C" unsigned long strlen(const char*);
+#endif
 
 struct string {
   usize count;

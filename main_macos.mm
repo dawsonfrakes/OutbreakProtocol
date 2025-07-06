@@ -1,6 +1,41 @@
 #include "basic.hpp"
 
 #import "AppKit/AppKit.h"
+#import <MetalKit/MetalKit.h>
+
+@interface MetalView : MTKView <MTKViewDelegate>
+@end
+
+@implementation MetalView {
+  id<MTLDevice> _device;
+  id<MTLCommandQueue> _commandQueue;
+}
+- (instancetype)initWithFrame:(NSRect)frameRect device:(id<MTLDevice>)device {
+  self = [super initWithFrame:frameRect device:device];
+  if (self) {
+    _device = device;
+    self.device = _device;
+    self.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    self.delegate = self;
+
+    _commandQueue = [_device newCommandQueue];
+  }
+  return self;
+}
+- (void)drawInMTKView:(MTKView *)view {
+  view.currentRenderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.6f, 0.2f, 0.2f, 1.0f);
+
+  id<MTLCommandBuffer> commandBuffer = [_commandQueue commandBuffer];
+  id<MTLRenderCommandEncoder> encoder = [commandBuffer renderCommandEncoderWithDescriptor:view.currentRenderPassDescriptor];
+  [encoder endEncoding];
+
+  [commandBuffer presentDrawable:view.currentDrawable];
+  [commandBuffer commit];
+}
+- (void)mtkView:(MTKView*)view drawableSizeWillChange:(CGSize)size {
+
+}
+@end
 
 static bool platform_running = true;
 static NSApplication* platform_app;
@@ -30,15 +65,19 @@ extern "C" int main() {
   [platform_app setWindowsMenu:windowmenu];
 
   platform_window = [[NSWindow alloc]
-    initWithContentRect:CGRect{CGPoint{0, 0}, CGSize{640, 480}}
+    initWithContentRect:NSMakeRect(0, 0, 640, 480)
     styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable
     backing:NSBackingStoreBuffered
     defer:NO];
   [platform_window setTitle:@"Outbreak Protocol"];
+  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+  MetalView* metal_view = [[MetalView alloc] initWithFrame:NSMakeRect(0, 0, 640, 480) device:device];
+  metal_view.autoresizingMask = NSViewWidthSizable|NSViewHeightSizable;
+  [platform_window.contentView addSubview:metal_view];
   [platform_window makeKeyAndOrderFront:nil];
 
   while (platform_running) {
-    while (NSEvent* ev = [platform_app nextEventMatchingMask:NSEventMaskAny untilDate:nil inMode:NSDefaultRunLoopMode dequeue:YES]) {
+    while (NSEvent* ev = [platform_app nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES]) {
       [platform_app sendEvent:ev];
       [ev release];
     }
