@@ -1,5 +1,6 @@
 struct Game_Input {
   f32 delta_time;
+  u16 screen_size[2];
   s32 mouse_delta[2];
   bool keys[128];
 };
@@ -75,6 +76,8 @@ static void game_update_and_render(slice<u8> memory, Game_Input* input, Game_Ren
     state->camera_position = {0.0f, 0.0f, -5.0f};
   }
 
+  if (input->screen_size[0] == 0 || input->screen_size[1] == 0) return;
+
   v3 direction = {};
   if (input->keys['W']) direction += {sin(state->camera_yaw), 0.0f, cos(state->camera_yaw)};
   if (input->keys['S']) direction += {-sin(state->camera_yaw), 0.0f, -cos(state->camera_yaw)};
@@ -91,13 +94,13 @@ static void game_update_and_render(slice<u8> memory, Game_Input* input, Game_Ren
 
   renderer->clear_color0 = {0.6f, 0.2f, 0.2f, 1.0f};
 
-  renderer->camera2d.viewport_size = {1024.0f, 768.0f};
+  renderer->camera2d.viewport_size = {cast(f32, input->screen_size[0]), cast(f32, input->screen_size[1])};
 
   renderer->camera.position = state->camera_position;
   renderer->camera.pitch = state->camera_pitch;
   renderer->camera.yaw = state->camera_yaw;
   renderer->camera.fov_y = 0.25f;
-  renderer->camera.aspect_ratio = 16.0f / 9.0f;
+  renderer->camera.aspect_ratio = cast(f32, input->screen_size[0]) / cast(f32, input->screen_size[1]);
   renderer->camera.z_near = 0.1f;
   renderer->camera.z_far = 5000.0f;
 

@@ -265,6 +265,7 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
 
     Game_Input game_input = {};
     game_input.delta_time = delta_time;
+    memcpy(game_input.screen_size, platform_size, size_of(platform_size));
     memcpy(game_input.mouse_delta, platform_mouse_delta, size_of(platform_mouse_delta));
     memcpy(game_input.keys, platform_keys, size_of(platform_keys));
     Game_Renderer game_renderer = {};
