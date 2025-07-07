@@ -514,7 +514,7 @@ static void d3d11_present(Game_Renderer* game_renderer) {
     d3d11.ctx->Unmap(d3d11.quad_instance_buffer, 0);
   }
 
-  m4 vp3d = m4_translate(-game_renderer->camera.position) * m4_perspective(
+    m4 vp3d = m4_from_q4(game_renderer->camera.rotation) * m4_translate(-game_renderer->camera.position) * m4_perspective(
     game_renderer->camera.fov_y,
     game_renderer->camera.aspect_ratio,
     game_renderer->camera.z_near,

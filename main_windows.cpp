@@ -123,6 +123,11 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
 
   bool sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR;
 
+  usize game_memory_size = 1 * 1024 * 1024 * 1024;
+  void* game_memory_base = VirtualAlloc(cast(void*, OP_DEBUG ? 0x8000000 : 0), game_memory_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+  assert(game_memory_base);
+  slice<u8> game_memory = {game_memory_size, cast(u8*, game_memory_base)};
+
   SetProcessDPIAware();
   WNDCLASSEXW wndclass = {};
   wndclass.cbSize = sizeof(WNDCLASSEXW);
@@ -135,7 +140,11 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
         GetRawInputData(cast(HRAWINPUT, lParam), RID_INPUT, &raw_input, &raw_input_size, sizeof(RAWINPUTHEADER));
 
         if (raw_input.header.dwType == RIM_TYPEMOUSE) {
-          if (raw_input.data.mouse.usFlags & MOUSE_MOVE_RELATIVE) {
+          // if ((raw_input.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE) {
+          //   platform_mouse[0] = raw_input.data.mouse.lLastX;
+          //   platform_mouse[1] = raw_input.data.mouse.lLastY;
+          // }
+          if ((raw_input.data.mouse.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE) {
             platform_mouse_delta[0] += raw_input.data.mouse.lLastX;
             platform_mouse_delta[1] += raw_input.data.mouse.lLastY;
           }
@@ -200,6 +209,12 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
     CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
     nullptr, nullptr, platform_hinstance, nullptr);
 
+  LARGE_INTEGER clock_frequency;
+  QueryPerformanceFrequency(&clock_frequency);
+  LARGE_INTEGER clock_start;
+  QueryPerformanceCounter(&clock_start);
+  LARGE_INTEGER clock_previous = clock_start;
+
   for (;;) {
     memset(platform_mouse_delta, 0, size_of(platform_mouse_delta));
 
@@ -234,8 +249,16 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
       }
     }
 
+    LARGE_INTEGER clock_current;
+    QueryPerformanceCounter(&clock_current);
+    f32 delta_time = cast(f32, clock_current.QuadPart - clock_previous.QuadPart) / cast(f32, clock_frequency.QuadPart);
+    clock_previous = clock_current;
+
+    Game_Input game_input = {};
+    game_input.delta_time = delta_time;
+    memcpy(game_input.mouse_delta, platform_mouse_delta, size_of(platform_mouse_delta));
     Game_Renderer game_renderer = {};
-    game_update_and_render(&game_renderer);
+    game_update_and_render(game_memory, &game_input, &game_renderer);
     platform_renderer->present(&game_renderer);
 
     if (sleep_is_granular) {

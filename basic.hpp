@@ -120,8 +120,16 @@ struct Bounded_Array {
 
 template <typename T, typename U> auto min(T x, U y) { return x < y ? x : y; }
 template <typename T, typename U> auto max(T x, U y) { return x > y ? x : y; }
+template <typename T> auto abs(T x) { return x < 0 ? -x : x; }
 
 static constexpr f32 TAU = 6.28318530717958647692f;
+
+static f32 fast_sqrt(f32 x) {
+  if (x == 0.0f) return 0.0f;
+  f32 guess = x * 0.5f;
+  guess = 0.5f * (guess + x / guess);
+  return guess;
+}
 
 static f32 fmod(f32 x, f32 y) {
   assert(y != 0.0f);
@@ -283,13 +291,79 @@ struct v4 {
 };
 
 struct q4 {
-  alignas(16) f32 w;
+  alignas(16) f32 w = 1.0f;
   f32 x;
   f32 y;
   f32 z;
 
   operator const f32*() const { return &w; }
+
+  q4 operator*(q4 rhs) {
+    q4 result;
+    result.w = w * rhs.w - x * rhs.x - y * rhs.y - z * rhs.z;
+    result.x = w * rhs.x + x * rhs.w + y * rhs.z - z * rhs.y;
+    result.y = w * rhs.y - x * rhs.z + y * rhs.w + z * rhs.x;
+    result.z = w * rhs.z + x * rhs.y - y * rhs.x + z * rhs.w;
+    return result;
+  }
+
+  q4 operator*=(q4 rhs) {
+    *this = *this * rhs;
+    return *this;
+  }
 };
+
+void normalize(q4* q) {
+  f32 mag_sq = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
+  if (mag_sq < 1e-12f) {
+    *q = {};
+    return;
+  }
+  if (abs(1.0f - mag_sq) < 1e-6f) return;
+  f32 inv_mag = 1.0f / fast_sqrt(mag_sq);
+  q->w *= inv_mag;
+  q->x *= inv_mag;
+  q->y *= inv_mag;
+  q->z *= inv_mag;
+}
+
+// static q4 inverse(q4 q) {
+//   q4 result;
+//   result.w = q.w;
+//   result.x = -q.x;
+//   result.y = -q.y;
+//   result.z = -q.z;
+//   return result;
+// }
+
+static q4 q4_from_angular_velocity(v3 w, f32 dt) {
+  f32 wx = w.x;
+  f32 wy = w.y;
+  f32 wz = w.z;
+  f32 angle = fast_sqrt(wx * wx + wy * wy + wz * wz) * dt;
+
+  if (angle < 1e-12f) return q4{1, 0, 0, 0};
+
+  f32 axis_x = wx;
+  f32 axis_y = wy;
+  f32 axis_z = wz;
+  f32 axis_length = 1.0f / fast_sqrt(axis_x * axis_x + axis_y * axis_y + axis_z * axis_z);
+
+  axis_x *= axis_length;
+  axis_y *= axis_length;
+  axis_z *= axis_length;
+
+  f32 half_angle = 0.5f * angle;
+  f32 sin_half = sin(half_angle);
+  f32 cos_half = cos(half_angle);
+
+  return q4{
+    cos_half,
+    axis_x * sin_half,
+    axis_y * sin_half,
+    axis_z * sin_half,
+  };
+}
 
 static q4 q4_from_euler(v3 euler) {
   f32 cy = cos(euler.y * 0.5f);

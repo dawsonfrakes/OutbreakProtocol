@@ -498,7 +498,9 @@ static void opengl_present(Game_Renderer* game_renderer) {
   m4 vp3d = m4_perspective<true>(game_renderer->camera.fov_y,
     game_renderer->camera.aspect_ratio,
     game_renderer->camera.z_near,
-    game_renderer->camera.z_far) * m4_translate<true>(-game_renderer->camera.position);
+    game_renderer->camera.z_far) *
+      m4_translate<true>(-game_renderer->camera.position) *
+      m4_from_q4<true>(game_renderer->camera.rotation);
 
   static OpenGL_Mesh_Instance mesh_instances[type_of_field(Game_Renderer, mesh_instances)::capacity];
   usize mesh_instances_count = 0;
