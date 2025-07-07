@@ -28,14 +28,14 @@ static void platform_log(string s) {
   #endif
 }
 
-// static void platform_assert(bool cond, string message, string _expr, string file, int line) {
-//   (void) _expr; (void) line;
-//   if (!cond) {
-//     platform_log(file);
-//     platform_log(message);
-//     debug_break();
-//   }
-// }
+static void platform_assert(bool cond, string message, string _expr, string file, int line) {
+  (void) _expr; (void) line;
+  if (!cond) {
+    platform_log(file);
+    platform_log(message);
+    debug_break();
+  }
+}
 
 static void platform_assert(bool cond, string expr, string file, int line) {
   (void) line;
@@ -83,7 +83,13 @@ static void platform_toggle_fullscreen() {
 }
 
 static void platform_update_cursor_clip() {
-  ClipCursor(nullptr);
+  RECT rect;
+  rect.left = 600;
+  rect.right = 601;
+  rect.top = 600;
+  rect.bottom = 601;
+  ClipCursor(&rect);
+  for (s32 x = ShowCursor(1); x >= 0; x -= 1) ShowCursor(0);
 }
 
 static void platform_clear_held_keys() {

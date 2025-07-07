@@ -39,7 +39,8 @@ struct Game_Camera_2D {
 
 struct Game_Camera_3D {
   v3 position;
-  q4 rotation;
+  f32 pitch;
+  f32 yaw;
   f32 fov_y;
   f32 aspect_ratio;
   f32 z_near;
@@ -58,7 +59,8 @@ struct Game_State {
   bool initted;
 
   v3 camera_position;
-  q4 camera_rotation;
+  f32 camera_pitch;
+  f32 camera_yaw;
 
   f32 objects_rotation;
 };
@@ -70,18 +72,19 @@ static void game_update_and_render(slice<u8> memory, Game_Input* input, Game_Ren
     state->initted = true;
 
     state->camera_position = {0.0f, 0.0f, -5.0f};
-    state->camera_rotation = {};
   }
 
-  state->camera_rotation *= q4_from_angular_velocity({cast(f32, input->mouse_delta[1]), cast(f32, input->mouse_delta[0]), 0.0f}, input->delta_time);
-  normalize(&state->camera_rotation);
+  state->camera_yaw += cast(f32, input->mouse_delta[0]) * 0.1f * input->delta_time;
+  state->camera_pitch += cast(f32, input->mouse_delta[1]) * 0.1f * input->delta_time;
+  state->camera_pitch = clamp(state->camera_pitch, -0.24f, 0.24f);
 
   renderer->clear_color0 = {0.6f, 0.2f, 0.2f, 1.0f};
 
   renderer->camera2d.viewport_size = {1024.0f, 768.0f};
 
   renderer->camera.position = state->camera_position;
-  renderer->camera.rotation = state->camera_rotation;
+  renderer->camera.pitch = state->camera_pitch;
+  renderer->camera.yaw = state->camera_yaw;
   renderer->camera.fov_y = 0.25f;
   renderer->camera.aspect_ratio = 16.0f / 9.0f;
   renderer->camera.z_near = 0.1f;

@@ -514,11 +514,13 @@ static void d3d11_present(Game_Renderer* game_renderer) {
     d3d11.ctx->Unmap(d3d11.quad_instance_buffer, 0);
   }
 
-    m4 vp3d = m4_from_q4(game_renderer->camera.rotation) * m4_translate(-game_renderer->camera.position) * m4_perspective(
-    game_renderer->camera.fov_y,
-    game_renderer->camera.aspect_ratio,
-    game_renderer->camera.z_near,
-    game_renderer->camera.z_far);
+  m4 vp3d = m4_rotate_y(-game_renderer->camera.yaw) *
+    m4_rotate_x(-game_renderer->camera.pitch) *
+    m4_translate(-game_renderer->camera.position) * m4_perspective(
+      game_renderer->camera.fov_y,
+      game_renderer->camera.aspect_ratio,
+      game_renderer->camera.z_near,
+      game_renderer->camera.z_far);
 
   static D3D11_Mesh_Instance mesh_instances[type_of_field(Game_Renderer, mesh_instances)::capacity];
   usize mesh_instances_count = 0;

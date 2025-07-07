@@ -120,6 +120,7 @@ struct Bounded_Array {
 
 template <typename T, typename U> auto min(T x, U y) { return x < y ? x : y; }
 template <typename T, typename U> auto max(T x, U y) { return x > y ? x : y; }
+template <typename T, typename U> auto clamp(T x, U xmin, U xmax) { return max(xmin, min(xmax, x)); }
 template <typename T> auto abs(T x) { return x < 0 ? -x : x; }
 
 static constexpr f32 TAU = 6.28318530717958647692f;
@@ -127,7 +128,9 @@ static constexpr f32 TAU = 6.28318530717958647692f;
 static f32 fast_sqrt(f32 x) {
   if (x == 0.0f) return 0.0f;
   f32 guess = x * 0.5f;
-  guess = 0.5f * (guess + x / guess);
+  for (u32 i = 0; i < 4; i += 1) {
+    guess = 0.5f * (guess + x / guess);
+  }
   return guess;
 }
 
@@ -262,14 +265,25 @@ struct v3 {
     return result;
   }
 
-  v3 operator/(v3 rhs) {
+  v3 operator/(f32 rhs) {
     v3 result;
-    result.x = x / rhs.x;
-    result.y = y / rhs.y;
-    result.z = z / rhs.z;
+    f32 rhs_inv = 1.0f / rhs;
+    result.x = x * rhs_inv;
+    result.y = y * rhs_inv;
+    result.z = z * rhs_inv;
     return result;
   }
 };
+
+static f32 length(v3 v) {
+  return fast_sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+static v3 normalize(v3 v) {
+  f32 mag = length(v);
+  if (mag == 0.0f) return 0.0f;
+  return v / mag;
+}
 
 // static v3 operator/(f32 lhs, v3 rhs) {
 //   v3 result;
@@ -315,7 +329,7 @@ struct q4 {
 
 void normalize(q4* q) {
   f32 mag_sq = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
-  if (mag_sq < 1e-12f) {
+  if (mag_sq < 1e-8f) {
     *q = {};
     return;
   }
@@ -327,41 +341,58 @@ void normalize(q4* q) {
   q->z *= inv_mag;
 }
 
-// static q4 inverse(q4 q) {
-//   q4 result;
-//   result.w = q.w;
-//   result.x = -q.x;
-//   result.y = -q.y;
-//   result.z = -q.z;
-//   return result;
-// }
+static q4 inverse(q4 q) {
+  q4 result;
+  result.w = q.w;
+  result.x = -q.x;
+  result.y = -q.y;
+  result.z = -q.z;
+  return result;
+}
+
+static q4 q4_from_axis_angle(v3 axis, f32 turns) {
+  f32 half_angle = 0.5f * turns;
+  f32 s = sin(half_angle);
+  f32 c = cos(half_angle);
+  return q4{c, axis.x * s, axis.y * s, axis.z * s};
+}
+
+static v3 q4_right(q4 q) {
+  return v3{
+    1.0f - 2.0f * (q.y * q.y + q.z * q.z),
+    2.0f * (q.x * q.y + q.w * q.z),
+    2.0f * (q.x * q.z - q.w * q.y),
+  };
+}
+
+static v3 q4_up(q4 q) {
+  return v3{
+    2.0f * (q.x * q.y - q.w * q.z),
+    1.0f - 2.0f * (q.x * q.x + q.z * q.z),
+    2.0f * (q.y * q.z + q.w * q.x),
+  };
+}
+
+static v3 q4_forward(q4 q) {
+  return v3{
+    2.0f * (q.x * q.z + q.w * q.y),
+    2.0f * (q.y * q.z - q.w * q.x),
+    1.0f - 2.0f * (q.x * q.x + q.y * q.y),
+  };
+}
 
 static q4 q4_from_angular_velocity(v3 w, f32 dt) {
-  f32 wx = w.x;
-  f32 wy = w.y;
-  f32 wz = w.z;
-  f32 angle = fast_sqrt(wx * wx + wy * wy + wz * wz) * dt;
-
-  if (angle < 1e-12f) return q4{1, 0, 0, 0};
-
-  f32 axis_x = wx;
-  f32 axis_y = wy;
-  f32 axis_z = wz;
-  f32 axis_length = 1.0f / fast_sqrt(axis_x * axis_x + axis_y * axis_y + axis_z * axis_z);
-
-  axis_x *= axis_length;
-  axis_y *= axis_length;
-  axis_z *= axis_length;
-
+  f32 angle = length(w) * dt;
+  if (angle < 1e-8f) return q4{1, 0, 0, 0};
+  v3 normal = normalize(w);
   f32 half_angle = 0.5f * angle;
   f32 sin_half = sin(half_angle);
   f32 cos_half = cos(half_angle);
-
   return q4{
     cos_half,
-    axis_x * sin_half,
-    axis_y * sin_half,
-    axis_z * sin_half,
+    normal.x * sin_half,
+    normal.y * sin_half,
+    normal.z * sin_half,
   };
 }
 
@@ -420,6 +451,48 @@ static m4 m4_translate(v3 by) {
       1.0f, 0.0f, 0.0f, by.x,
       0.0f, 1.0f, 0.0f, by.y,
       0.0f, 0.0f, 1.0f, by.z,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  }
+}
+
+template<bool row_major = false>
+static m4 m4_rotate_x(f32 turns) {
+  f32 c = cos(turns);
+  f32 s = sin(turns);
+  if (row_major) {
+    return m4{{
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, +c, +s, 0.0f,
+      0.0f, -s, +c, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  } else {
+    return m4{{
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, +c, -s, 0.0f,
+      0.0f, +s, +c, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  }
+}
+
+template<bool row_major = false>
+static m4 m4_rotate_y(f32 turns) {
+  f32 c = cos(turns);
+  f32 s = sin(turns);
+  if (row_major) {
+    return m4{{
+      +c, 0.0f, -s, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      +s, 0.0f, +c, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f,
+    }};
+  } else {
+    return m4{{
+      +c, 0.0f, +s, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      -s, 0.0f, +c, 0.0f,
       0.0f, 0.0f, 0.0f, 1.0f,
     }};
   }

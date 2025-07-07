@@ -500,7 +500,8 @@ static void opengl_present(Game_Renderer* game_renderer) {
     game_renderer->camera.z_near,
     game_renderer->camera.z_far) *
       m4_translate<true>(-game_renderer->camera.position) *
-      m4_from_q4<true>(game_renderer->camera.rotation);
+      m4_rotate_x<true>(-game_renderer->camera.pitch) *
+      m4_rotate_y<true>(-game_renderer->camera.yaw);
 
   static OpenGL_Mesh_Instance mesh_instances[type_of_field(Game_Renderer, mesh_instances)::capacity];
   usize mesh_instances_count = 0;
