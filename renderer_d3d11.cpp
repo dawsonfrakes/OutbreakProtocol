@@ -234,15 +234,14 @@ static void d3d11_init() {
     slice<u8> bmp_file = platform_read_entire_file("textures/container.bmp", bmp_file_backing);
     s32 bmp_width = *cast(s32*, bmp_file.data + 18);
     s32 bmp_height = *cast(s32*, bmp_file.data + 22);
-    u32* bmp_image_data = cast(u32*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
+    u8* bmp_image_data = cast(u8*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
 
-    // convert from 24-bit to 32-bit in place. @LittleEndian
-    u8* image_data_bytes = cast(u8*, bmp_image_data);
+    // convert from 24-bit to 32-bit in place.
     for (s32 i = bmp_width * bmp_height - 1; i >= 0; i -= 1) {
-      image_data_bytes[i * 4 + 0] = image_data_bytes[i * 3 + 0];
-      image_data_bytes[i * 4 + 1] = image_data_bytes[i * 3 + 1];
-      image_data_bytes[i * 4 + 2] = image_data_bytes[i * 3 + 2];
-      image_data_bytes[i * 4 + 3] = 0xFF;
+      bmp_image_data[i * 4 + 0] = bmp_image_data[i * 3 + 0];
+      bmp_image_data[i * 4 + 1] = bmp_image_data[i * 3 + 1];
+      bmp_image_data[i * 4 + 2] = bmp_image_data[i * 3 + 2];
+      bmp_image_data[i * 4 + 3] = 0xFF;
     }
 
     D3D11_TEXTURE2D_DESC mesh_texture_desc = {};

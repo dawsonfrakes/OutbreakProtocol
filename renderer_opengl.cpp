@@ -1,3 +1,9 @@
+#if OP_OS_WINDOWS
+  #define APIENTRY WINAPI
+#else
+  #define APIENTRY
+#endif
+
 // 1.0
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_TRIANGLES 0x0004
@@ -111,7 +117,7 @@
 // 4.3
 #define GL_DEBUG_OUTPUT 0x92E0
 
-typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); // @Cleanup callconv
+typedef void (APIENTRY* GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*);
 
 #define GL43_FUNCTIONS \
   X(void, glDebugMessageCallback, GLDEBUGPROC, const void*)
@@ -140,6 +146,7 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
   X(void, glCreateTextures, u32, u32, u32*) \
   X(void, glTextureStorage2D, u32, u32, u32, u32, u32) \
   X(void, glTextureSubImage2D, u32, s32, s32, s32, u32, u32, u32, u32, const void*) \
+  X(void, glTextureParameteri, u32, u32, s32) \
   X(void, glBindTextureUnit, u32, u32)
 
 #if OP_OS_WINDOWS
@@ -345,11 +352,15 @@ static void opengl_init() {
     slice<u8> bmp_file = platform_read_entire_file("textures/container.bmp", bmp_file_backing);
     s32 bmp_width = *cast(s32*, bmp_file.data + 18);
     s32 bmp_height = *cast(s32*, bmp_file.data + 22);
-    u32* bmp_image_data = cast(u32*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
+    u8* bmp_image_data = cast(u8*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
 
     glCreateTextures(GL_TEXTURE_2D, 1, &opengl.mesh_textures[Game_Mesh::CUBE]);
     glTextureStorage2D(opengl.mesh_textures[Game_Mesh::CUBE], 1, GL_RGBA8, bmp_width, bmp_height);
     glTextureSubImage2D(opengl.mesh_textures[Game_Mesh::CUBE], 0, 0, 0, bmp_width, bmp_height, GL_BGR, GL_UNSIGNED_BYTE, bmp_image_data);
+    glTextureParameteri(opengl.mesh_textures[Game_Mesh::CUBE], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(opengl.mesh_textures[Game_Mesh::CUBE], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(opengl.mesh_textures[Game_Mesh::CUBE], GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(opengl.mesh_textures[Game_Mesh::CUBE], GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     string vsrc =
     "#version 450\n"
