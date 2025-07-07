@@ -54,8 +54,14 @@
   X(void, glClear, u32)
 
 // 1.1
+#define GL_RGBA8 0x8058
+
 #define GL11_FUNCTIONS \
   X(void, glDrawElements, u32, u32, u32, const void*)
+
+// 1.2
+#define GL_BGR 0x80E0
+#define GL_BGRA 0x80E1
 
 // 1.5
 #define GL_STATIC_DRAW 0x88E4
@@ -98,6 +104,10 @@
 #define GL_MAX_COLOR_TEXTURE_SAMPLES 0x910E
 #define GL_MAX_DEPTH_TEXTURE_SAMPLES 0x910F
 
+// 4.1
+#define GL41_FUNCTIONS \
+  X(void, glProgramUniform1i, u32, s32, s32)
+
 // 4.3
 #define GL_DEBUG_OUTPUT 0x92E0
 
@@ -126,7 +136,11 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
   X(void, glVertexArrayAttribFormat, u32, u32, s32, u32, bool, u32) \
   X(void, glCreateBuffers, u32, u32*) \
   X(void, glNamedBufferData, u32, ssize, const void*, u32) \
-  X(void, glNamedBufferSubData, u32, ssize, ssize, const void*)
+  X(void, glNamedBufferSubData, u32, ssize, ssize, const void*) \
+  X(void, glCreateTextures, u32, u32, u32*) \
+  X(void, glTextureStorage2D, u32, u32, u32, u32, u32) \
+  X(void, glTextureSubImage2D, u32, s32, s32, s32, u32, u32, u32, u32, const void*) \
+  X(void, glBindTextureUnit, u32, u32)
 
 #if OP_OS_WINDOWS
   #define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -147,6 +161,7 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
     GL20_FUNCTIONS
     GL30_FUNCTIONS
     GL31_FUNCTIONS
+    GL41_FUNCTIONS
     GL43_FUNCTIONS
     GL45_FUNCTIONS
   #undef X
@@ -182,6 +197,7 @@ typedef void (*GLDEBUGPROC)(u32, u32, u32, u32, u32, const char*, const void*); 
       GL20_FUNCTIONS
       GL30_FUNCTIONS
       GL31_FUNCTIONS
+      GL41_FUNCTIONS
       GL43_FUNCTIONS
       GL45_FUNCTIONS
     #undef X
@@ -222,6 +238,7 @@ static struct {
   u32 quad_vao;
   u32 quad_ibo;
 
+  u32 mesh_textures[cast(u32, Game_Mesh::COUNT)];
   u32 mesh_shader;
   u32 mesh_vao;
   u32 mesh_ibo;
@@ -323,6 +340,16 @@ static void opengl_init() {
   }
 
   {
+    static u8 bmp_file_backing[1024 * 1024 * 4];
+    slice<u8> bmp_file = platform_read_entire_file("textures/container.bmp", bmp_file_backing);
+    s32 bmp_width = *cast(s32*, bmp_file.data + 18);
+    s32 bmp_height = *cast(s32*, bmp_file.data + 22);
+    u32* bmp_image_data = cast(u32*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
+
+    glCreateTextures(GL_TEXTURE_2D, 1, &opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
+    glTextureStorage2D(opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)], 1, GL_RGBA8, bmp_width, bmp_height);
+    glTextureSubImage2D(opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)], 0, 0, 0, bmp_width, bmp_height, GL_BGR, GL_UNSIGNED_BYTE, bmp_image_data);
+
     string vsrc =
     "#version 450\n"
     "layout(location = 0) in vec3 a_position;\n"
@@ -346,8 +373,9 @@ static void opengl_init() {
     "layout(location = 1) in vec3 f_normal;\n"
     "layout(location = 2) in vec2 f_texcoord;\n"
     "layout(location = 0) out vec4 color;\n"
+    "layout(location = 0) uniform sampler2D u_texture;\n"
     "void main() {\n"
-    "  color = vec4(f_texcoord, 0.0, 1.0);\n"
+    "  color = texture(u_texture, f_texcoord);\n"
     "}\n";
     const char* fsrcs[1] = {fsrc.data};
     u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -474,6 +502,8 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glBindVertexArray(opengl.quad_vao);
   glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(quad_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, quad_instances_count));
 
+  glBindTextureUnit(0, opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
+  glProgramUniform1i(opengl.mesh_shader, 0, 0);
   glUseProgram(opengl.mesh_shader);
   glBindVertexArray(opengl.mesh_vao);
   glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(cube_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, mesh_instances_count));
