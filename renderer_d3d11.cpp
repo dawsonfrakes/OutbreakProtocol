@@ -256,10 +256,10 @@ static void d3d11_init() {
     D3D11_SUBRESOURCE_DATA mesh_texture_data = {};
     mesh_texture_data.pSysMem = bmp_image_data;
     mesh_texture_data.SysMemPitch = bmp_width * sizeof(u32);
-    hr = d3d11.device->CreateTexture2D(&mesh_texture_desc, &mesh_texture_data, &d3d11.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
+    hr = d3d11.device->CreateTexture2D(&mesh_texture_desc, &mesh_texture_data, &d3d11.mesh_textures[Game_Mesh::CUBE]);
     if (FAILED(hr)) goto defer;
 
-    hr = d3d11.device->CreateShaderResourceView(d3d11.mesh_textures[cast(u32, Game_Mesh::CUBE)], nullptr, &d3d11.mesh_texture_views[cast(u32, Game_Mesh::CUBE)]);
+    hr = d3d11.device->CreateShaderResourceView(d3d11.mesh_textures[Game_Mesh::CUBE], nullptr, &d3d11.mesh_texture_views[Game_Mesh::CUBE]);
     if (FAILED(hr)) goto defer;
 
     D3D11_BUFFER_DESC mesh_vertex_buffer_desc = {};
@@ -372,7 +372,7 @@ static void d3d11_deinit() {
   if (d3d11.mesh_instance_buffer) d3d11.mesh_instance_buffer->Release();
   if (d3d11.mesh_index_buffer) d3d11.mesh_index_buffer->Release();
   if (d3d11.mesh_vertex_buffer) d3d11.mesh_vertex_buffer->Release();
-  for (usize i = 0; i < cast(u32, Game_Mesh::COUNT); i += 1) {
+  for (usize i = 0; i < Game_Mesh::COUNT; i += 1) {
     if (d3d11.mesh_texture_views[i]) d3d11.mesh_texture_views[i]->Release();
     if (d3d11.mesh_textures[i]) d3d11.mesh_textures[i]->Release();
   }
@@ -559,7 +559,7 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->IASetIndexBuffer(d3d11.quad_index_buffer, DXGI_FORMAT_R16_UINT, 0);
   d3d11.ctx->DrawIndexedInstanced(cast(u32, len(quad_indices)), cast(u32, quad_instances_count), 0, 0, 0);
 
-  d3d11.ctx->PSSetShaderResources(0, 1, &d3d11.mesh_texture_views[cast(u32, Game_Mesh::CUBE)]);
+  d3d11.ctx->PSSetShaderResources(0, 1, &d3d11.mesh_texture_views[Game_Mesh::CUBE]);
   d3d11.ctx->PSSetSamplers(0, 1, &d3d11.linear_sampler);
   d3d11.ctx->IASetInputLayout(d3d11.mesh_input_layout);
   d3d11.ctx->VSSetShader(d3d11.mesh_vertex_shader, nullptr, 0);

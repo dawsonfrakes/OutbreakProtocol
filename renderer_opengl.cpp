@@ -238,7 +238,7 @@ static struct {
   u32 quad_vao;
   u32 quad_ibo;
 
-  u32 mesh_textures[cast(u32, Game_Mesh::COUNT)];
+  u32 mesh_textures[Game_Mesh::COUNT];
   u32 mesh_shader;
   u32 mesh_vao;
   u32 mesh_ibo;
@@ -346,9 +346,9 @@ static void opengl_init() {
     s32 bmp_height = *cast(s32*, bmp_file.data + 22);
     u32* bmp_image_data = cast(u32*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
 
-    glCreateTextures(GL_TEXTURE_2D, 1, &opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
-    glTextureStorage2D(opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)], 1, GL_RGBA8, bmp_width, bmp_height);
-    glTextureSubImage2D(opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)], 0, 0, 0, bmp_width, bmp_height, GL_BGR, GL_UNSIGNED_BYTE, bmp_image_data);
+    glCreateTextures(GL_TEXTURE_2D, 1, &opengl.mesh_textures[Game_Mesh::CUBE]);
+    glTextureStorage2D(opengl.mesh_textures[Game_Mesh::CUBE], 1, GL_RGBA8, bmp_width, bmp_height);
+    glTextureSubImage2D(opengl.mesh_textures[Game_Mesh::CUBE], 0, 0, 0, bmp_width, bmp_height, GL_BGR, GL_UNSIGNED_BYTE, bmp_image_data);
 
     string vsrc =
     "#version 450\n"
@@ -510,7 +510,7 @@ static void opengl_present(Game_Renderer* game_renderer) {
   glBindVertexArray(opengl.quad_vao);
   glDrawElementsInstanced(GL_TRIANGLES, cast(u32, len(quad_indices)), GL_UNSIGNED_SHORT, cast(void*, 0), cast(u32, quad_instances_count));
 
-  glBindTextureUnit(0, opengl.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
+  glBindTextureUnit(0, opengl.mesh_textures[Game_Mesh::CUBE]);
   glProgramUniform1i(opengl.mesh_shader, 0, 0);
   glUseProgram(opengl.mesh_shader);
   glBindVertexArray(opengl.mesh_vao);
