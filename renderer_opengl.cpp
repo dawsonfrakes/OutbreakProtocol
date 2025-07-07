@@ -332,10 +332,11 @@ static void opengl_init() {
     glVertexArrayAttribBinding(opengl.quad_vao, texcoord_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.quad_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Quad_Vertex, texcoord));
 
-    for (u32 i = 2; i < 6; i += 1) {
+    u32 transform_attrib_base = 2;
+    for (u32 i = transform_attrib_base; i < transform_attrib_base + 4; i += 1) {
       glEnableVertexArrayAttrib(opengl.quad_vao, i);
       glVertexArrayAttribBinding(opengl.quad_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+      glVertexArrayAttribFormat(opengl.quad_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Quad_Instance, transform) + (i - transform_attrib_base) * sizeof(v4));
     }
   }
 
@@ -423,10 +424,11 @@ static void opengl_init() {
     glVertexArrayAttribBinding(opengl.mesh_vao, texcoord_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Mesh_Vertex, texcoord));
 
-    for (u32 i = 3; i < 7; i += 1) {
+    u32 transform_attrib_base = 3;
+    for (u32 i = transform_attrib_base; i < transform_attrib_base + 4; i += 1) {
       glEnableVertexArrayAttrib(opengl.mesh_vao, i);
       glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - 3) * sizeof(v4));
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - transform_attrib_base) * sizeof(v4));
     }
   }
 

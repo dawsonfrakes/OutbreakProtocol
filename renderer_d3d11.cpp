@@ -217,12 +217,13 @@ static void d3d11_init() {
     quad_input_layout_elements[1].Format = DXGI_FORMAT_R32G32_FLOAT;
     quad_input_layout_elements[1].AlignedByteOffset = offset_of(Game_Quad_Vertex, texcoord);
     quad_input_layout_elements[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-    for (usize i = 2; i < 6; i += 1) {
+    usize quad_transform_base = 2;
+    for (usize i = quad_transform_base; i < quad_transform_base + 4; i += 1) {
       quad_input_layout_elements[i].SemanticName = "Transform";
-      quad_input_layout_elements[i].SemanticIndex = cast(u32, i - 2);
+      quad_input_layout_elements[i].SemanticIndex = cast(u32, i - quad_transform_base);
       quad_input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
       quad_input_layout_elements[i].InputSlot = 1;
-      quad_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Quad_Instance, transform) + (i - 2) * sizeof(v4));
+      quad_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Quad_Instance, transform) + (i - quad_transform_base) * sizeof(v4));
       quad_input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
       quad_input_layout_elements[i].InstanceDataStepRate = 1;
     }
@@ -341,12 +342,13 @@ static void d3d11_init() {
     mesh_input_layout_elements[2].Format = DXGI_FORMAT_R32G32_FLOAT;
     mesh_input_layout_elements[2].AlignedByteOffset = offset_of(Game_Mesh_Vertex, texcoord);
     mesh_input_layout_elements[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-    for (usize i = 3; i < 7; i += 1) {
+    usize mesh_transform_base = 3;
+    for (usize i = mesh_transform_base; i < mesh_transform_base + 4; i += 1) {
       mesh_input_layout_elements[i].SemanticName = "Transform";
-      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - 3);
+      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - mesh_transform_base);
       mesh_input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
       mesh_input_layout_elements[i].InputSlot = 1;
-      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, transform) + (i - 3) * sizeof(v4));
+      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, transform) + (i - mesh_transform_base) * sizeof(v4));
       mesh_input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
       mesh_input_layout_elements[i].InstanceDataStepRate = 1;
     }

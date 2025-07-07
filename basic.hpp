@@ -125,8 +125,7 @@ static constexpr f32 TAU = 6.28318530717958647692f;
 
 static f32 fmod(f32 x, f32 y) {
   assert(y != 0.0f);
-  s32 n = cast(s32, x / y);
-  return x - n * y;
+  return x - cast(s32, x / y) * y;
 }
 
 static f32 wrap(f32 turns) {
