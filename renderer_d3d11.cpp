@@ -324,13 +324,13 @@ static void d3d11_init() {
       "Texture2D tex;\n"
       "SamplerState samp;\n"
       "float4 pmain(VOutput input) : SV_Target0 {\n"
-      "  return float4(abs(input.normal), 1.0f);\n"
-      // "  float3 position_to_light = light_position - input.model_position;\n"
-      // "  float distance_to_light = length(position_to_light);\n"
-      // "  float3 light_normal = position_to_light / distance_to_light;\n"
-      // "  float attenuation = 1.0f / (attenuation_constant + attenuation_linear * distance_to_light + attenuation_quadratic * (distance_to_light * distance_to_light));\n"
-      // "  float3 diffuse = diffuse_color * diffuse_intensity + attenuation * max(0.0f, dot(light_normal, input.normal));\n"
-      // "  return float4(saturate(tex.Sample(samp, input.texcoord).xyz + diffuse + ambient), 1.0f);\n"
+      // "  return float4(abs(input.normal), 1.0f);\n"
+      "  float3 position_to_light = light_position - input.model_position;\n"
+      "  float distance_to_light = length(position_to_light);\n"
+      "  float3 light_normal = position_to_light / distance_to_light;\n"
+      "  float attenuation = 1.0f / (attenuation_constant + attenuation_linear * distance_to_light + attenuation_quadratic * (distance_to_light * distance_to_light));\n"
+      "  float3 diffuse = diffuse_color * diffuse_intensity + attenuation * max(0.0f, dot(light_normal, input.normal));\n"
+      "  return float4(saturate(tex.Sample(samp, input.texcoord).xyz * (diffuse + ambient)), 1.0f);\n"
       "}\n";
 
     hr = D3DCompile(mesh_shader_source.data, mesh_shader_source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &mesh_vblob, nullptr);

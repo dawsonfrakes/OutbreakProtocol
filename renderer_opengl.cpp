@@ -393,8 +393,20 @@ static void opengl_init() {
     "layout(location = 0) out vec4 color;\n"
     "layout(location = 0) uniform sampler2D u_texture;\n"
     "void main() {\n"
-    // "  color = texture(u_texture, f_texcoord);\n"
-    "  color = vec4(abs(f_normal), 1.0);\n"
+    "  vec3 light_position = vec3(10.0, 10.0, 10.0);\n"
+    "  vec3 ambient = vec3(0.15, 0.15, 0.15);\n"
+    "  vec3 diffuse_color = vec3(0.6, 0.2, 0.2);\n"
+    "  float diffuse_intensity = 0.2;\n"
+    "  float attenuation_constant = 1.0;\n"
+    "  float attenuation_linear = 0.045;\n"
+    "  float attenuation_quadratic = 0.0075;\n"
+    "  vec3 position_to_light = light_position - f_model_position;\n"
+    "  float distance_to_light = length(position_to_light);\n"
+    "  vec3 light_normal = position_to_light / distance_to_light;\n"
+    "  float attenuation = 1.0 / (attenuation_constant + attenuation_linear * distance_to_light + attenuation_quadratic * (distance_to_light * distance_to_light));\n"
+    "  vec3 diffuse = diffuse_color * diffuse_intensity + attenuation * max(0.0, dot(light_normal, f_normal));\n"
+    "  color = vec4(clamp(texture(u_texture, f_texcoord).xyz * (diffuse + ambient), 0.0, 1.0), 1.0);\n"
+    // "  color = vec4(abs(f_normal), 1.0);\n"
     "}\n";
     const char* fsrcs[1] = {fsrc.data};
     u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
