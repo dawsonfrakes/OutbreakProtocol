@@ -1,6 +1,7 @@
 struct Game_Input {
   f32 delta_time;
   s32 mouse_delta[2];
+  bool keys[128];
 };
 
 struct Game_Quad_Vertex {
@@ -73,6 +74,16 @@ static void game_update_and_render(slice<u8> memory, Game_Input* input, Game_Ren
 
     state->camera_position = {0.0f, 0.0f, -5.0f};
   }
+
+  v3 direction = {};
+  if (input->keys['W']) direction += {sin(state->camera_yaw), 0.0f, cos(state->camera_yaw)};
+  if (input->keys['S']) direction += {-sin(state->camera_yaw), 0.0f, -cos(state->camera_yaw)};
+  if (input->keys['D']) direction += {cos(state->camera_yaw), 0.0f, -sin(state->camera_yaw)};
+  if (input->keys['A']) direction += {-cos(state->camera_yaw), 0.0f, sin(state->camera_yaw)};
+  if (input->keys['E']) direction.y += 1.0f;
+  if (input->keys['Q']) direction.y -= 1.0f;
+  direction = normalize(direction);
+  state->camera_position += direction * 10.0f * input->delta_time;
 
   state->camera_yaw += cast(f32, input->mouse_delta[0]) * 0.1f * input->delta_time;
   state->camera_pitch += cast(f32, input->mouse_delta[1]) * 0.1f * input->delta_time;

@@ -273,6 +273,11 @@ struct v3 {
     result.z = z * rhs_inv;
     return result;
   }
+
+  v3 operator+=(v3 rhs) {
+    *this = *this + rhs;
+    return *this;
+  }
 };
 
 static f32 length(v3 v) {

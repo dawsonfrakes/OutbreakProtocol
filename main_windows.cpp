@@ -18,6 +18,7 @@ static HDC platform_hdc;
 static u16 platform_size[2];
 static u16 platform_mouse[2];
 static s32 platform_mouse_delta[2];
+static bool platform_keys[128];
 
 static void platform_log(string s) {
   #if OP_DEBUG
@@ -93,7 +94,7 @@ static void platform_update_cursor_clip() {
 }
 
 static void platform_clear_held_keys() {
-
+  memset(platform_keys, 0, size_of(platform_keys));
 }
 
 static void platform_debug_set_window_title_to_platform_renderer() {
@@ -245,6 +246,8 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
               if (msg.wParam == VK_RETURN && alt) platform_toggle_fullscreen();
               if (OP_DEBUG && msg.wParam == VK_F6) platform_switch_renderer(platform_renderer == &d3d11_renderer ? &opengl_renderer : &d3d11_renderer);
             }
+
+            platform_keys[cast(u8, msg.wParam)] = pressed;
           }
           break;
         }
@@ -263,6 +266,7 @@ extern "C" [[noreturn]] void WINAPI WinMainCRTStartup() {
     Game_Input game_input = {};
     game_input.delta_time = delta_time;
     memcpy(game_input.mouse_delta, platform_mouse_delta, size_of(platform_mouse_delta));
+    memcpy(game_input.keys, platform_keys, size_of(platform_keys));
     Game_Renderer game_renderer = {};
     game_update_and_render(game_memory, &game_input, &game_renderer);
     platform_renderer->present(&game_renderer);
