@@ -90,8 +90,19 @@ struct string {
   char* data;
 
   string(usize count, const char* data) : count(count), data(cast(char*, data)) {}
+  string(type_of(nullptr)) : count(0), data(nullptr) {}
   string(const char* s) : count(strlen(s)), data(cast(char*, s)) {}
   template<usize N> string(const char (&s)[N]) : count(N - 1), data(cast(char*, s)) {}
+};
+
+template<typename T>
+struct slice {
+  usize count;
+  T* data;
+
+  slice(usize count, const T* data) : count(count), data(cast(T*, data)) {}
+  slice(type_of(nullptr)) : count(0), data(nullptr) {}
+  template<usize N> slice(const T (&s)[N]) : count(N), data(cast(T*, s)) {}
 };
 
 static void platform_assert(bool cond, string message, string _expr, string file = __FILE__, int line = __LINE__);

@@ -37,6 +37,8 @@ static struct {
   ID3D11PixelShader* quad_pixel_shader;
   ID3D11InputLayout* quad_input_layout;
 
+  ID3D11Texture2D* mesh_textures[Game_Mesh::COUNT];
+  ID3D11ShaderResourceView* mesh_texture_views[Game_Mesh::COUNT];
   ID3D11Buffer* mesh_vertex_buffer;
   ID3D11Buffer* mesh_index_buffer;
   ID3D11Buffer* mesh_instance_buffer;
@@ -184,14 +186,12 @@ static void d3d11_init() {
       "  float4 position : SV_Position;\n"
       "  float2 texcoord : Texcoord;\n"
       "};\n"
-      "\n"
       "VOutput vmain(VInput input) {\n"
       "  VOutput output;\n"
       "  output.position = mul(float4(input.position, 1.0f), input.transform);\n"
       "  output.texcoord = input.texcoord;\n"
       "  return output;\n"
       "}\n"
-      "\n"
       "float4 pmain(VOutput input) : SV_Target0 {\n"
       "  return float4(input.texcoord, 0.0f, 1.0f);\n"
       "}\n";
@@ -227,6 +227,39 @@ static void d3d11_init() {
       quad_input_layout_elements[i].InstanceDataStepRate = 1;
     }
     hr = d3d11.device->CreateInputLayout(quad_input_layout_elements, cast(u32, len(quad_input_layout_elements)), quad_vblob->GetBufferPointer(), quad_vblob->GetBufferSize(), &d3d11.quad_input_layout);
+    if (FAILED(hr)) goto defer;
+
+    static u8 bmp_file_backing[1024 * 1024 * 4];
+    slice<u8> bmp_file = platform_read_entire_file("textures/container.bmp", bmp_file_backing);
+    s32 bmp_width = *cast(s32*, bmp_file.data + 18);
+    s32 bmp_height = *cast(s32*, bmp_file.data + 22);
+    u32* bmp_image_data = cast(u32*, bmp_file.data + *cast(u32*, bmp_file.data + 10));
+
+    // convert from 24-bit to 32-bit in place. @LittleEndian
+    u8* image_data_bytes = cast(u8*, bmp_image_data);
+    for (s32 i = bmp_width * bmp_height - 1; i >= 0; i -= 1) {
+      image_data_bytes[i * 4 + 0] = image_data_bytes[i * 3 + 0];
+      image_data_bytes[i * 4 + 1] = image_data_bytes[i * 3 + 1];
+      image_data_bytes[i * 4 + 2] = image_data_bytes[i * 3 + 2];
+      image_data_bytes[i * 4 + 3] = 0xFF;
+    }
+
+    D3D11_TEXTURE2D_DESC mesh_texture_desc = {};
+    mesh_texture_desc.Width = bmp_width;
+    mesh_texture_desc.Height = bmp_height;
+    mesh_texture_desc.MipLevels = 1;
+    mesh_texture_desc.ArraySize = 1;
+    mesh_texture_desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    mesh_texture_desc.SampleDesc.Count = 1;
+    mesh_texture_desc.Usage = D3D11_USAGE_DEFAULT;
+    mesh_texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    D3D11_SUBRESOURCE_DATA mesh_texture_data = {};
+    mesh_texture_data.pSysMem = bmp_image_data;
+    mesh_texture_data.SysMemPitch = bmp_width * sizeof(u32);
+    hr = d3d11.device->CreateTexture2D(&mesh_texture_desc, &mesh_texture_data, &d3d11.mesh_textures[cast(u32, Game_Mesh::CUBE)]);
+    if (FAILED(hr)) goto defer;
+
+    hr = d3d11.device->CreateShaderResourceView(d3d11.mesh_textures[cast(u32, Game_Mesh::CUBE)], nullptr, &d3d11.mesh_texture_views[cast(u32, Game_Mesh::CUBE)]);
     if (FAILED(hr)) goto defer;
 
     D3D11_BUFFER_DESC mesh_vertex_buffer_desc = {};
@@ -270,7 +303,6 @@ static void d3d11_init() {
       "  float3 normal : Normal;\n"
       "  float2 texcoord : Texcoord;\n"
       "};\n"
-      "\n"
       "VOutput vmain(VInput input) {\n"
       "  VOutput output;\n"
       "  output.position = mul(float4(input.position, 1.0f), input.transform);\n"
@@ -278,9 +310,10 @@ static void d3d11_init() {
       "  output.texcoord = input.texcoord;\n"
       "  return output;\n"
       "}\n"
-      "\n"
+      "Texture2D tex;\n"
+      "SamplerState samp;\n"
       "float4 pmain(VOutput input) : SV_Target0 {\n"
-      "  return float4(input.texcoord, 0.0f, 1.0f);\n"
+      "  return tex.Sample(samp, input.texcoord);\n"
       "}\n";
 
     hr = D3DCompile(mesh_shader_source.data, mesh_shader_source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &mesh_vblob, nullptr);
@@ -339,6 +372,10 @@ static void d3d11_deinit() {
   if (d3d11.mesh_instance_buffer) d3d11.mesh_instance_buffer->Release();
   if (d3d11.mesh_index_buffer) d3d11.mesh_index_buffer->Release();
   if (d3d11.mesh_vertex_buffer) d3d11.mesh_vertex_buffer->Release();
+  for (usize i = 0; i < cast(u32, Game_Mesh::COUNT); i += 1) {
+    if (d3d11.mesh_texture_views[i]) d3d11.mesh_texture_views[i]->Release();
+    if (d3d11.mesh_textures[i]) d3d11.mesh_textures[i]->Release();
+  }
 
   if (d3d11.quad_input_layout) d3d11.quad_input_layout->Release();
   if (d3d11.quad_pixel_shader) d3d11.quad_pixel_shader->Release();
@@ -504,6 +541,8 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   d3d11.ctx->IASetIndexBuffer(d3d11.quad_index_buffer, DXGI_FORMAT_R16_UINT, 0);
   d3d11.ctx->DrawIndexedInstanced(cast(u32, len(quad_indices)), cast(u32, quad_instances_count), 0, 0, 0);
 
+  d3d11.ctx->PSSetShaderResources(0, 1, &d3d11.mesh_texture_views[cast(u32, Game_Mesh::CUBE)]);
+  d3d11.ctx->PSSetSamplers(0, 1, &d3d11.linear_sampler);
   d3d11.ctx->IASetInputLayout(d3d11.mesh_input_layout);
   d3d11.ctx->VSSetShader(d3d11.mesh_vertex_shader, nullptr, 0);
   d3d11.ctx->PSSetShader(d3d11.mesh_pixel_shader, nullptr, 0);

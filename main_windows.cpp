@@ -46,6 +46,17 @@ static void platform_assert(bool cond, string expr, string file, int line) {
   }
 }
 
+static slice<u8> platform_read_entire_file(string path, slice<u8> buffer) {
+  assert(buffer.data);
+  assert(buffer.count <= 0xFFFFFFFF);
+  HANDLE file = CreateFileA(path.data, GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) return nullptr;
+  DWORD nread;
+  ReadFile(file, buffer.data, cast(DWORD, buffer.count), &nread, nullptr);
+  CloseHandle(file);
+  return {nread, buffer.data};
+}
+
 #include "renderer.cpp"
 
 static Platform_Renderer* platform_renderer = &d3d11_renderer;
