@@ -231,7 +231,8 @@ struct OpenGL_Quad_Instance {
 };
 
 struct OpenGL_Mesh_Instance {
-  m4 transform;
+  m4 world_transform;
+  m4 model_transform;
   Game_Mesh::Type mesh_index;
 };
 
@@ -368,12 +369,15 @@ static void opengl_init() {
     "layout(location = 0) in vec3 a_position;\n"
     "layout(location = 1) in vec3 a_normal;\n"
     "layout(location = 2) in vec2 a_texcoord;\n"
-    "layout(location = 3) in mat4 i_transform;\n"
+    "layout(location = 3) in mat4 i_world_transform;\n"
+    "layout(location = 7) in mat4 i_model_transform;\n"
+    "layout(location = 0) out vec3 f_model_position;\n"
     "layout(location = 1) out vec3 f_normal;\n"
     "layout(location = 2) out vec2 f_texcoord;\n"
     "void main() {\n"
-    "  gl_Position = i_transform * vec4(a_position, 1.0);\n"
-    "  f_normal = a_normal;\n"
+    "  gl_Position = i_world_transform * vec4(a_position, 1.0);\n"
+    "  f_model_position = vec3(i_model_transform * vec4(a_position, 1.0));\n"
+    "  f_normal = mat3(i_model_transform) * a_normal;\n"
     "  f_texcoord = a_texcoord;\n"
     "}\n";
     const char* vsrcs[1] = {vsrc.data};
@@ -383,12 +387,14 @@ static void opengl_init() {
 
     string fsrc =
     "#version 450\n"
+    "layout(location = 0) in vec3 f_model_position;\n"
     "layout(location = 1) in vec3 f_normal;\n"
     "layout(location = 2) in vec2 f_texcoord;\n"
     "layout(location = 0) out vec4 color;\n"
     "layout(location = 0) uniform sampler2D u_texture;\n"
     "void main() {\n"
-    "  color = texture(u_texture, f_texcoord);\n"
+    // "  color = texture(u_texture, f_texcoord);\n"
+    "  color = vec4(abs(f_normal), 1.0);\n"
     "}\n";
     const char* fsrcs[1] = {fsrc.data};
     u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -436,11 +442,18 @@ static void opengl_init() {
     glVertexArrayAttribBinding(opengl.mesh_vao, texcoord_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, offset_of(Game_Mesh_Vertex, texcoord));
 
-    u32 transform_attrib_base = 3;
-    for (u32 i = transform_attrib_base; i < transform_attrib_base + 4; i += 1) {
+    u32 world_transform_attrib_base = 3;
+    for (u32 i = world_transform_attrib_base; i < world_transform_attrib_base + 4; i += 1) {
       glEnableVertexArrayAttrib(opengl.mesh_vao, i);
       glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
-      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, transform) + (i - transform_attrib_base) * sizeof(v4));
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, world_transform) + (i - world_transform_attrib_base) * sizeof(v4));
+    }
+
+    u32 model_transform_attrib_base = 7;
+    for (u32 i = model_transform_attrib_base; i < model_transform_attrib_base + 4; i += 1) {
+      glEnableVertexArrayAttrib(opengl.mesh_vao, i);
+      glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, offset_of(OpenGL_Mesh_Instance, model_transform) + (i - model_transform_attrib_base) * sizeof(v4));
     }
   }
 
@@ -508,11 +521,13 @@ static void opengl_present(Game_Renderer* game_renderer) {
   usize mesh_instances_count = 0;
   for (usize i = 0; i < game_renderer->mesh_instances.count; i += 1) {
     Game_Mesh_Instance* instance = game_renderer->mesh_instances.data + i;
-    mesh_instances[mesh_instances_count++].transform =
-      vp3d *
+    mesh_instances[mesh_instances_count].model_transform =
       m4_translate<true>(instance->transform.position) *
       m4_from_q4<true>(instance->transform.rotation) *
       m4_scale(instance->transform.scale);
+    mesh_instances[mesh_instances_count].world_transform = vp3d *
+      mesh_instances[mesh_instances_count].model_transform;
+    mesh_instances_count += 1;
   }
   glNamedBufferSubData(opengl.mesh_ibo, 0, mesh_instances_count * sizeof(OpenGL_Mesh_Instance), mesh_instances);
 

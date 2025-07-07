@@ -7,7 +7,8 @@ struct D3D11_Quad_Instance {
 };
 
 struct D3D11_Mesh_Instance {
-  m4 transform;
+  m4 world_transform;
+  m4 model_transform;
   Game_Mesh::Type mesh_index;
 };
 
@@ -292,28 +293,44 @@ static void d3d11_init() {
     if (FAILED(hr)) goto defer;
 
     string mesh_shader_source =
+      "static float3 light_position = {10.0f, 10.0f, 10.0f};\n"
+      "static float3 ambient = {0.15f, 0.15f, 0.15f};\n"
+      "static float3 diffuse_color = {0.6f, 0.2f, 0.2f};\n"
+      "static float diffuse_intensity = 0.2f;\n"
+      "static float attenuation_constant = 1.0f;\n"
+      "static float attenuation_linear = 0.045f;\n"
+      "static float attenuation_quadratic = 0.0075f;\n"
       "struct VInput {\n"
       "  float3 position : Position;\n"
       "  float3 normal : Normal;\n"
       "  float2 texcoord : Texcoord;\n"
-      "  matrix transform : Transform;\n"
+      "  matrix world_transform : World_Transform;\n"
+      "  matrix model_transform : Model_Transform;\n"
       "};\n"
       "struct VOutput {\n"
       "  float4 position : SV_Position;\n"
+      "  float3 model_position : Position;\n"
       "  float3 normal : Normal;\n"
       "  float2 texcoord : Texcoord;\n"
       "};\n"
       "VOutput vmain(VInput input) {\n"
       "  VOutput output;\n"
-      "  output.position = mul(float4(input.position, 1.0f), input.transform);\n"
-      "  output.normal = input.normal;\n"
+      "  output.position = mul(float4(input.position, 1.0f), input.world_transform);\n"
+      "  output.model_position = (float3) mul(float4(input.position, 1.0f), input.model_transform);\n"
+      "  output.normal = mul(input.normal, (float3x3) input.model_transform);\n"
       "  output.texcoord = input.texcoord;\n"
       "  return output;\n"
       "}\n"
       "Texture2D tex;\n"
       "SamplerState samp;\n"
       "float4 pmain(VOutput input) : SV_Target0 {\n"
-      "  return tex.Sample(samp, input.texcoord);\n"
+      "  return float4(abs(input.normal), 1.0f);\n"
+      // "  float3 position_to_light = light_position - input.model_position;\n"
+      // "  float distance_to_light = length(position_to_light);\n"
+      // "  float3 light_normal = position_to_light / distance_to_light;\n"
+      // "  float attenuation = 1.0f / (attenuation_constant + attenuation_linear * distance_to_light + attenuation_quadratic * (distance_to_light * distance_to_light));\n"
+      // "  float3 diffuse = diffuse_color * diffuse_intensity + attenuation * max(0.0f, dot(light_normal, input.normal));\n"
+      // "  return float4(saturate(tex.Sample(samp, input.texcoord).xyz + diffuse + ambient), 1.0f);\n"
       "}\n";
 
     hr = D3DCompile(mesh_shader_source.data, mesh_shader_source.count, nullptr, nullptr, nullptr, "vmain", "vs_5_0", D3DCOMPILE_DEBUG, 0, &mesh_vblob, nullptr);
@@ -328,7 +345,7 @@ static void d3d11_init() {
     hr = d3d11.device->CreatePixelShader(mesh_pblob->GetBufferPointer(), mesh_pblob->GetBufferSize(), nullptr, &d3d11.mesh_pixel_shader);
     if (FAILED(hr)) goto defer;
 
-    D3D11_INPUT_ELEMENT_DESC mesh_input_layout_elements[7] = {};
+    D3D11_INPUT_ELEMENT_DESC mesh_input_layout_elements[11] = {};
     mesh_input_layout_elements[0].SemanticName = "Position";
     mesh_input_layout_elements[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
     mesh_input_layout_elements[0].AlignedByteOffset = offset_of(Game_Mesh_Vertex, position);
@@ -341,13 +358,23 @@ static void d3d11_init() {
     mesh_input_layout_elements[2].Format = DXGI_FORMAT_R32G32_FLOAT;
     mesh_input_layout_elements[2].AlignedByteOffset = offset_of(Game_Mesh_Vertex, texcoord);
     mesh_input_layout_elements[2].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-    usize mesh_transform_base = 3;
-    for (usize i = mesh_transform_base; i < mesh_transform_base + 4; i += 1) {
-      mesh_input_layout_elements[i].SemanticName = "Transform";
-      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - mesh_transform_base);
+    usize mesh_world_transform_base = 3;
+    for (usize i = mesh_world_transform_base; i < mesh_world_transform_base + 4; i += 1) {
+      mesh_input_layout_elements[i].SemanticName = "World_Transform";
+      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - mesh_world_transform_base);
       mesh_input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
       mesh_input_layout_elements[i].InputSlot = 1;
-      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, transform) + (i - mesh_transform_base) * sizeof(v4));
+      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, world_transform) + (i - mesh_world_transform_base) * sizeof(v4));
+      mesh_input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
+      mesh_input_layout_elements[i].InstanceDataStepRate = 1;
+    }
+    usize mesh_model_transform_base = 7;
+    for (usize i = mesh_model_transform_base; i < mesh_model_transform_base + 4; i += 1) {
+      mesh_input_layout_elements[i].SemanticName = "Model_Transform";
+      mesh_input_layout_elements[i].SemanticIndex = cast(u32, i - mesh_model_transform_base);
+      mesh_input_layout_elements[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+      mesh_input_layout_elements[i].InputSlot = 1;
+      mesh_input_layout_elements[i].AlignedByteOffset = cast(u32, offset_of(D3D11_Mesh_Instance, model_transform) + (i - mesh_model_transform_base) * sizeof(v4));
       mesh_input_layout_elements[i].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
       mesh_input_layout_elements[i].InstanceDataStepRate = 1;
     }
@@ -527,13 +554,15 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   usize mesh_instances_count = 0;
   for (usize i = 0; i < game_renderer->mesh_instances.count; i += 1) {
     Game_Mesh_Instance* instance = game_renderer->mesh_instances.data + i;
-    mesh_instances[mesh_instances_count].transform =
+    mesh_instances[mesh_instances_count].model_transform =
       m4_scale(instance->transform.scale) *
       m4_from_q4(instance->transform.rotation) *
-      m4_translate(instance->transform.position) *
+      m4_translate(instance->transform.position);
+    mesh_instances[mesh_instances_count].world_transform =
+      mesh_instances[mesh_instances_count].model_transform *
       vp3d;
     mesh_instances[mesh_instances_count].mesh_index = instance->mesh_index;
-    mesh_instances_count++;
+    mesh_instances_count += 1;
   }
 
   mapped = {};
