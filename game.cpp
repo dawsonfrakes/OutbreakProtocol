@@ -13,15 +13,16 @@ struct Game_Mesh_Vertex {
   v2 texcoord;
 };
 
-enum struct Game_Mesh : u32 {
-  ERROR = 0,
-  CUBE = 1,
-  COUNT,
-};
+namespace Game_Mesh {
+  typedef u32 Type;
+  constexpr Type ERROR = 0;
+  constexpr Type CUBE = 1;
+  constexpr Type COUNT = 2;
+}
 
 struct Game_Mesh_Instance {
   x3 transform;
-  Game_Mesh mesh_index;
+  Game_Mesh::Type mesh_index;
 };
 
 #include "static_mesh_data.cpp"

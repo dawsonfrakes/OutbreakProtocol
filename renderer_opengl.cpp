@@ -224,7 +224,7 @@ struct OpenGL_Quad_Instance {
 
 struct OpenGL_Mesh_Instance {
   m4 transform;
-  Game_Mesh mesh_index;
+  Game_Mesh::Type mesh_index;
 };
 
 static struct {
@@ -445,6 +445,14 @@ static void opengl_resize() {
   s32 fbo_depth_samples_max;
   glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &fbo_depth_samples_max);
   u32 fbo_samples = cast(u32, max(1, min(fbo_color_samples_max, fbo_depth_samples_max)));
+
+  // @Cleanup: string formatting.
+  if (fbo_samples == 32) platform_log("Samples: 32");
+  else if (fbo_samples == 16) platform_log("Samples: 16");
+  else if (fbo_samples == 8) platform_log("Samples: 8");
+  else if (fbo_samples == 4) platform_log("Samples: 4");
+  else if (fbo_samples == 2) platform_log("Samples: 2");
+  else if (fbo_samples == 1) platform_log("Samples: 1");
 
   glNamedRenderbufferStorageMultisample(opengl.main_fbo_color0, fbo_samples, GL_RGBA16F, platform_size[0], platform_size[1]);
   glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, opengl.main_fbo_color0);

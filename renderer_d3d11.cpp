@@ -8,7 +8,7 @@ struct D3D11_Quad_Instance {
 
 struct D3D11_Mesh_Instance {
   m4 transform;
-  Game_Mesh mesh_index;
+  Game_Mesh::Type mesh_index;
 };
 
 static struct {
@@ -425,13 +425,31 @@ static void d3d11_resize() {
     hr = d3d11.device->CreateRenderTargetView(swapchain_backbuffer, nullptr, &d3d11.swapchain_backbuffer_view);
     if (FAILED(hr)) goto defer;
 
+    u32 samples = 1;
+    for (u32 i = 32; i > 1; i >>= 1) {
+      u32 quality_levels;
+      hr = d3d11.device->CheckMultisampleQualityLevels(DXGI_FORMAT_R16G16B16A16_FLOAT, i, &quality_levels);
+      if (SUCCEEDED(hr) && quality_levels > 0) {
+        samples = i;
+        break;
+      }
+    }
+
+    // @Cleanup: string formatting.
+    if (samples == 32) platform_log("Samples: 32");
+    else if (samples == 16) platform_log("Samples: 16");
+    else if (samples == 8) platform_log("Samples: 8");
+    else if (samples == 4) platform_log("Samples: 4");
+    else if (samples == 2) platform_log("Samples: 2");
+    else if (samples == 1) platform_log("Samples: 1");
+
     D3D11_TEXTURE2D_DESC multisampled_backbuffer_desc = {};
     multisampled_backbuffer_desc.Width = platform_size[0];
     multisampled_backbuffer_desc.Height = platform_size[1];
     multisampled_backbuffer_desc.MipLevels = 1;
     multisampled_backbuffer_desc.ArraySize = 1;
     multisampled_backbuffer_desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    multisampled_backbuffer_desc.SampleDesc.Count = 8;
+    multisampled_backbuffer_desc.SampleDesc.Count = samples;
     multisampled_backbuffer_desc.Usage = D3D11_USAGE_DEFAULT;
     multisampled_backbuffer_desc.BindFlags = D3D11_BIND_RENDER_TARGET;
     hr = d3d11.device->CreateTexture2D(&multisampled_backbuffer_desc, nullptr, &d3d11.multisampled_backbuffer);
@@ -455,7 +473,7 @@ static void d3d11_resize() {
     depthbuffer_desc.MipLevels = 1;
     depthbuffer_desc.ArraySize = 1;
     depthbuffer_desc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthbuffer_desc.SampleDesc.Count = 8;
+    depthbuffer_desc.SampleDesc.Count = samples;
     depthbuffer_desc.Usage = D3D11_USAGE_DEFAULT;
     depthbuffer_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     hr = d3d11.device->CreateTexture2D(&depthbuffer_desc, nullptr, &d3d11.depthbuffer);
