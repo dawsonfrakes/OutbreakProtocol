@@ -90,7 +90,7 @@ static void d3d11_init() {
     D3D11_DEPTH_STENCIL_DESC depthbuffer_state_desc = {};
     depthbuffer_state_desc.DepthEnable = true;
     depthbuffer_state_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-    depthbuffer_state_desc.DepthFunc = D3D11_COMPARISON_GREATER_EQUAL;
+    depthbuffer_state_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
     hr = d3d11.device->CreateDepthStencilState(&depthbuffer_state_desc, &d3d11.depthbuffer_state);
     if (FAILED(hr)) goto defer;
 
@@ -492,7 +492,7 @@ static void d3d11_present(Game_Renderer* game_renderer) {
   if (!d3d11.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
 
   d3d11.ctx->ClearRenderTargetView(d3d11.multisampled_backbuffer_view, game_renderer->clear_color0);
-  d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 0.0f, 0);
+  d3d11.ctx->ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
   m4 vp2d = m4_translate(-game_renderer->camera2d.position) * m4_scale({1.0f / game_renderer->camera2d.viewport_size, 1.0f});
 

@@ -7,6 +7,7 @@
 // 1.0
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_TRIANGLES 0x0004
+#define GL_LEQUAL 0x0203
 #define GL_GEQUAL 0x0206
 #define GL_SRC_ALPHA 0x0302
 #define GL_ONE_MINUS_SRC_ALPHA 0x0303
@@ -477,7 +478,7 @@ static void opengl_resize() {
 static void opengl_present(Game_Renderer* game_renderer) {
   if (!opengl.initted || platform_size[0] == 0 || platform_size[1] == 0) return;
 
-  f32 clear_depth = 0.0f;
+  f32 clear_depth = 1.0f;
   glClearNamedFramebufferfv(opengl.main_fbo, GL_DEPTH, 0, &clear_depth);
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer->clear_color0);
 
@@ -517,7 +518,7 @@ static void opengl_present(Game_Renderer* game_renderer) {
 
   glViewport(0, 0, platform_size[0], platform_size[1]);
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
-  glDepthFunc(GL_GEQUAL);
+  glDepthFunc(GL_LEQUAL);
   glEnable(GL_DEPTH_TEST);
   glFrontFace(GL_CW);
   glEnable(GL_CULL_FACE);

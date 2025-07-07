@@ -103,7 +103,7 @@ static void game_update_and_render(slice<u8> memory, Game_Input* input, Game_Ren
 
   state->objects_rotation += 0.5f * input->delta_time;
 
-  renderer->quad_instances += {{{-200, +0.5, 1.0f}, 0.0f, 100.0f}};
+  renderer->quad_instances += {{{-200, +0.5, 0.0f}, 0.0f, 100.0f}};
 
   u32 i = 0;
   for (f32 x = -5.0f; x <= 5.0f; x += 5.0f) {
