@@ -4,20 +4,22 @@ import basic.windows;
 import renderer : Platform_Renderer;
 import renderer_null : null_renderer;
 
+static import game;
+
 __gshared {
   HINSTANCE platform_hinstance;
   HWND platform_hwnd;
   HDC platform_hdc;
   u16[2] platform_size;
   immutable(Platform_Renderer)* platform_renderer;
-  debug {
+  version (DLL) {
     HMODULE platform_renderer_dll;
     const(wchar)[] platform_renderer_path; // NOTE(dfra): path and name are only valid if dll is not null.
     const(char)[] platform_renderer_name;
   }
 }
 
-debug {
+version (DLL) {
   void set_window_title_to_platform_renderer_name() {
     if (!platform_renderer_dll) SetWindowTextA(platform_hwnd, "Outbreak Protocol [NULL]");
     else if (platform_renderer_name.length == "d3d11_renderer".length) SetWindowTextA(platform_hwnd, "Outbreak Protocol [D3D11]"); // @LengthHack
@@ -143,7 +145,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
         s32 round_mode = DWMWCP_DONOTROUND;
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
 
-        debug set_platform_renderer_from_dll(".build/renderer_d3d11.dll", "d3d11_renderer");
+        version (DLL) set_platform_renderer_from_dll(".build/renderer_d3d11.dll", "d3d11_renderer_");
         else {
           import renderer_d3d11 : d3d11_renderer;
           platform_renderer = &d3d11_renderer;
@@ -193,13 +195,13 @@ extern(Windows) noreturn WinMainCRTStartup() {
               debug if (wParam == VK_ESCAPE) DestroyWindow(platform_hwnd);
               if (wParam == VK_F11) toggle_fullscreen();
               if (wParam == VK_RETURN && alt) toggle_fullscreen();
-              debug if (wParam == VK_F6) {
+              version (DLL) if (wParam == VK_F6) {
                 if (platform_renderer_name.length == "opengl_renderer".length) // @LengthHack
-                  switch_to_renderer_in_dll(".build/renderer_d3d11.dll", "d3d11_renderer");
+                  switch_to_renderer_in_dll(".build/renderer_d3d11.dll", "d3d11_renderer_");
                 else
-                  switch_to_renderer_in_dll(".build/renderer_opengl.dll", "opengl_renderer");
+                  switch_to_renderer_in_dll(".build/renderer_opengl.dll", "opengl_renderer_");
               }
-              debug if (wParam == VK_F7) reload_dll_renderer();
+              version (DLL) if (wParam == VK_F7) reload_dll_renderer();
             }
           }
           break;
@@ -210,7 +212,16 @@ extern(Windows) noreturn WinMainCRTStartup() {
       }
     }
 
-    platform_renderer.present();
+    game.Game_Renderer game_renderer;
+    version (DLL) {
+      HMODULE lib = LoadLibraryW(".build/game.dll");
+      auto game_update_and_render = cast(typeof(game.game_update_and_render)*) GetProcAddress(lib, "game_update_and_render_");
+      game_update_and_render(&game_renderer);
+      FreeLibrary(lib);
+    } else {
+      game.game_update_and_render(&game_renderer);
+    }
+    platform_renderer.present(&game_renderer);
 
     if (sleep_is_granular) {
       Sleep(1);
@@ -221,6 +232,8 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
   ExitProcess(0);
 }
+
+extern(C) int _fltused;
 
 pragma(linkerDirective, "-subsystem:windows");
 pragma(lib, "kernel32");

@@ -1,4 +1,5 @@
 import basic;
+static import game;
 
 enum Platform_Renderer_Bits : u32 {
   NULL = 0,
@@ -13,11 +14,11 @@ struct Platform_Renderer {
       HWND hwnd;
       HDC hdc;
     }
-    ushort[2] size;
+    u16[2] size;
   }
 
   void function(Init_Data*) init_;
   void function() deinit;
-  void function(ushort[2]) resize;
-  void function() present;
+  void function(u16[2]) resize;
+  void function(game.Game_Renderer*) present;
 }

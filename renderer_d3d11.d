@@ -1,5 +1,6 @@
 import basic;
 import basic.windows;
+static import game;
 import renderer : Platform_Renderer;
 
 struct D3D11_Data {
@@ -63,7 +64,7 @@ void d3d11_deinit() {
   d3d11 = d3d11.init;
 }
 
-void d3d11_resize(ushort[2] size) {
+void d3d11_resize(u16[2] size) {
   HRESULT hr;
   ID3D11Texture2D* swapchain_backbuffer = void;
 
@@ -85,20 +86,21 @@ defer:
   if (hr != 0) d3d11_deinit();
 }
 
-void d3d11_present() {
+void d3d11_present(game.Game_Renderer* game_renderer) {
   if (!d3d11.initted) return;
 
-  __gshared f32[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
-  d3d11.ctx.ClearRenderTargetView(d3d11.swapchain_backbuffer_view, clear_color0.ptr);
+  d3d11.ctx.ClearRenderTargetView(d3d11.swapchain_backbuffer_view, game_renderer.clear_color0.ptr);
 
   d3d11.swapchain.Present(0, 0);
 }
 
-extern(C) export immutable d3d11_renderer = Platform_Renderer(
+immutable d3d11_renderer = Platform_Renderer(
   &d3d11_init,
   &d3d11_deinit,
   &d3d11_resize,
   &d3d11_present,
 );
+
+version (DLL) mixin DLLExport!d3d11_renderer;
 
 pragma(lib, "d3d11");

@@ -1,4 +1,5 @@
 import basic;
+static import game;
 import renderer : Platform_Renderer;
 
 version (Windows) {
@@ -30,7 +31,7 @@ version (Windows) {
     }
   }
 
-  void opengl_platform_init(Platform_Renderer.Init_Data* init_data) {
+  bool opengl_platform_init(Platform_Renderer.Init_Data* init_data) {
     opengl_platform.hdc = init_data.hdc;
 
     PIXELFORMATDESCRIPTOR pfd;
@@ -71,6 +72,8 @@ version (Windows) {
         mixin(member~" = cast(typeof("~member~")) wglGetProcAddress(\""~member~"\");");
       }
     }
+
+    return true;
   }
 
   void opengl_platform_deinit() {
@@ -87,29 +90,73 @@ version (Windows) {
   pragma(lib, "opengl32");
 }
 
+struct OpenGL_Data {
+  bool initted;
+  u16[2] size;
+
+  u32 main_fbo;
+  u32 main_fbo_color0;
+  u32 main_fbo_depth;
+}
+
+__gshared OpenGL_Data opengl;
+
 void opengl_init(Platform_Renderer.Init_Data* init_data) {
-  opengl_platform_init(init_data);
+  opengl.initted = opengl_platform_init(init_data);
 
   glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
+  glCreateFramebuffers(1, &opengl.main_fbo);
+  glCreateRenderbuffers(1, &opengl.main_fbo_color0);
+  glCreateRenderbuffers(1, &opengl.main_fbo_depth);
 }
 
 void opengl_deinit() {
+  opengl = opengl.init;
   opengl_platform_deinit();
 }
 
-void opengl_resize(ushort[2] size) {
+void opengl_resize(u16[2] size) {
+  opengl.size = size;
+  if (!opengl.initted || opengl.size[0] == 0 || opengl.size[1] == 0) return;
 
+  s32 fbo_color_samples_max = void;
+  glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &fbo_color_samples_max);
+  s32 fbo_depth_samples_max = void;
+  glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &fbo_depth_samples_max);
+  u32 fbo_samples = cast(u32) max(0, min(fbo_color_samples_max, fbo_depth_samples_max));
+
+  glNamedRenderbufferStorageMultisample(opengl.main_fbo_color0, fbo_samples, GL_RGBA16F, size[0], size[1]);
+  glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, opengl.main_fbo_color0);
+
+  glNamedRenderbufferStorageMultisample(opengl.main_fbo_depth, fbo_samples, GL_DEPTH_COMPONENT32F, size[0], size[1]);
+  glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, opengl.main_fbo_depth);
 }
 
-void opengl_present() {
-  glClearColor(0.6, 0.2, 0.2, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT);
+void opengl_present(game.Game_Renderer* game_renderer) {
+  if (!opengl.initted || opengl.size[0] == 0 || opengl.size[1] == 0) return;
+
+  glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
+
+  glClear(0); // NOTE(dfra): this fixes intel default framebuffer resize bug.
+
+  glEnable(GL_FRAMEBUFFER_SRGB);
+  glBlitNamedFramebuffer(opengl.main_fbo, 0,
+    0, 0, opengl.size[0], opengl.size[1],
+    0, 0, opengl.size[0], opengl.size[1],
+    GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  glDisable(GL_FRAMEBUFFER_SRGB);
+
   opengl_platform_present();
 }
 
-extern(C) export immutable opengl_renderer = Platform_Renderer(
+immutable opengl_renderer = Platform_Renderer(
   &opengl_init,
   &opengl_deinit,
   &opengl_resize,
   &opengl_present,
 );
+
+version (DLL) mixin DLLExport!opengl_renderer;
