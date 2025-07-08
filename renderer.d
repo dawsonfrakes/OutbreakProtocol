@@ -17,6 +17,6 @@ struct Platform_Renderer {
 
   void function(Init_Data*) init_;
   void function() deinit;
-  void function() resize;
+  void function(ushort[2]) resize;
   void function() present;
 }

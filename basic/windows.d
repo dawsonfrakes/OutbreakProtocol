@@ -1272,6 +1272,7 @@ struct ID3D11Texture1D {
   mixin COMClass;
 }
 struct ID3D11Texture2D {
+  __gshared immutable uuidof = IID(0x6F15AAF2, 0xD208, 0x4E89, [0x9A, 0xB4, 0x48, 0x95, 0x35, 0xD3, 0x4F, 0x9C]);
   struct VTable {
     ID3D11Resource.VTable id3d11resource_vtable;
     alias this = id3d11resource_vtable;

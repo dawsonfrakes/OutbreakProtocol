@@ -42,7 +42,7 @@ debug {
     set_platform_renderer_from_dll(path, name);
     auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
     platform_renderer.init_(&init_data);
-    platform_renderer.resize();
+    platform_renderer.resize(platform_size);
   }
 
   void reload_dll_renderer() {
@@ -54,7 +54,7 @@ debug {
     set_platform_renderer_from_dll(platform_renderer_path, platform_renderer_name);
     auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
     platform_renderer.init_(&init_data);
-    platform_renderer.resize();
+    platform_renderer.resize(platform_size);
   }
 }
 
@@ -63,7 +63,7 @@ void switch_renderer(immutable(Platform_Renderer)* renderer) {
   platform_renderer = renderer;
   auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
   platform_renderer.init_(&init_data);
-  platform_renderer.resize();
+  platform_renderer.resize(platform_size);
 }
 
 void toggle_fullscreen() {
@@ -127,7 +127,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
       case WM_SIZE:
         platform_size = [cast(u16) lParam, cast(u16) (lParam >>> 16)];
 
-        platform_renderer.resize();
+        platform_renderer.resize(platform_size);
         return 0;
       case WM_CREATE:
         platform_hwnd = hwnd;

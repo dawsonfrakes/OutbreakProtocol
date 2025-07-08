@@ -1,13 +1,14 @@
 import basic;
 import basic.windows;
 import renderer : Platform_Renderer;
-import main_windows : platform_hwnd, platform_size;
 
 struct D3D11_Data {
   bool initted;
   IDXGISwapChain* swapchain;
   ID3D11Device* device;
   ID3D11DeviceContext* ctx;
+
+  ID3D11RenderTargetView* swapchain_backbuffer_view;
 }
 
 __gshared D3D11_Data d3d11;
@@ -35,19 +36,44 @@ defer:
   if (hr != 0) d3d11_deinit();
 }
 
+void d3d11_deinit_swapchain() {
+  if (d3d11.swapchain_backbuffer_view) d3d11.swapchain_backbuffer_view.Release();
+}
+
 void d3d11_deinit() {
+  d3d11_deinit_swapchain();
   if (d3d11.ctx) d3d11.ctx.Release();
   if (d3d11.device) d3d11.device.Release();
   if (d3d11.swapchain) d3d11.swapchain.Release();
   d3d11 = d3d11.init;
 }
 
-void d3d11_resize() {
+void d3d11_resize(ushort[2] size) {
+  HRESULT hr;
+  ID3D11Texture2D* swapchain_backbuffer = void;
+
   if (!d3d11.initted) return;
+
+  d3d11_deinit_swapchain();
+
+  hr = d3d11.swapchain.ResizeBuffers(1, size[0], size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
+  if (hr < 0) goto defer;
+
+  hr = d3d11.swapchain.GetBuffer(0, &swapchain_backbuffer.uuidof, cast(void**) &swapchain_backbuffer);
+  if (hr < 0) goto defer;
+
+  hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) swapchain_backbuffer, null, &d3d11.swapchain_backbuffer_view);
+  if (hr < 0) goto defer;
+
+defer:
+  if (swapchain_backbuffer) swapchain_backbuffer.Release();
+  if (hr != 0) d3d11_deinit();
 }
 
 void d3d11_present() {
   if (!d3d11.initted) return;
+  __gshared f32[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
+  d3d11.ctx.ClearRenderTargetView(d3d11.swapchain_backbuffer_view, clear_color0.ptr);
   d3d11.swapchain.Present(0, 0);
 }
 

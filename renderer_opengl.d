@@ -28,7 +28,7 @@ void opengl_deinit() {
 
 }
 
-void opengl_resize() {
+void opengl_resize(ushort[2] size) {
 
 }
 
