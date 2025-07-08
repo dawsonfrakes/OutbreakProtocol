@@ -5,17 +5,27 @@ import renderer : Platform_Renderer;
 
 struct D3D11_Data {
   bool initted;
+  u16[2] size;
   IDXGISwapChain* swapchain;
   ID3D11Device* device;
   ID3D11DeviceContext* ctx;
 
+  ID3D11SamplerState* linear_sampler;
+  ID3D11VertexShader* fullscreen_vertex_shader;
+  ID3D11PixelShader* fullscreen_pixel_shader;
+
   ID3D11RenderTargetView* swapchain_backbuffer_view;
+  ID3D11Texture2D* multisampled_backbuffer;
+  ID3D11RenderTargetView* multisampled_backbuffer_view;
+  ID3D11Texture2D* resolved_backbuffer;
+  ID3D11ShaderResourceView* resolved_backbuffer_view;
 }
 
 __gshared D3D11_Data d3d11;
 
 void d3d11_init(Platform_Renderer.Init_Data* init_data) {
   HRESULT hr;
+  ID3DBlob* blob;
   {
     DXGI_SWAP_CHAIN_DESC swapchain_descriptor;
     swapchain_descriptor.BufferDesc.Width = init_data.size[0];
@@ -46,18 +56,87 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
       dxgi_device.Release();
     }
 
+    D3D11_SAMPLER_DESC linear_sampler_desc;
+    linear_sampler_desc.Filter = D3D11_FILTER.MIN_MAG_MIP_LINEAR;
+    linear_sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_MODE.CLAMP;
+    linear_sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_MODE.CLAMP;
+    linear_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_MODE.CLAMP;
+    linear_sampler_desc.ComparisonFunc = D3D11_COMPARISON_FUNC.NEVER;
+    linear_sampler_desc.MipLODBias = 0;
+    linear_sampler_desc.MinLOD = 0;
+    linear_sampler_desc.MaxLOD = f32.max;
+    hr = d3d11.device.CreateSamplerState(&linear_sampler_desc, &d3d11.linear_sampler);
+    if (hr < 0) goto defer;
+
+    string fullscreen_source = `
+      struct VS_OUTPUT {
+        float4 position : SV_POSITION;
+        float2 texcoord : TEXCOORD0;
+      };
+
+      VS_OUTPUT vmain(uint id : SV_VertexID) {
+        VS_OUTPUT output;
+        float2 position = float2((id << 1) & 2, id & 2);
+        output.position = float4(position * float2(2.0, -2.0) + float2(-1.0, 1.0), 0, 1);
+        output.texcoord = position;
+        return output;
+      }
+
+      float3 ACESFilm(float3 x) {
+        float a = 2.51;
+        float b = 0.03;
+        float c = 2.43;
+        float d = 0.59;
+        float e = 0.14;
+        return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+      }
+
+      Texture2D hdr_texture : register(t0);
+      SamplerState linear_sampler : register(s0);
+
+      float4 pmain(VS_OUTPUT input) : SV_Target {
+          float3 hdr_color = hdr_texture.Sample(linear_sampler, input.texcoord).rgb;
+          // float3 tonemapped = ACESFilm(hdr_color);
+          return float4(hdr_color, 1.0);
+      }
+    `;
+
+    hr = D3DCompile(fullscreen_source.ptr, fullscreen_source.length, null, null, null, "vmain", "vs_5_0", D3DCOMPILE_FLAG.DEBUG, 0, &blob, null);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreateVertexShader(blob.GetBufferPointer(), blob.GetBufferSize(), null, &d3d11.fullscreen_vertex_shader);
+    if (hr < 0) goto defer;
+    blob.Release();
+    blob = null;
+
+    hr = D3DCompile(fullscreen_source.ptr, fullscreen_source.length, null, null, null, "pmain", "ps_5_0", D3DCOMPILE_FLAG.DEBUG, 0, &blob, null);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreatePixelShader(blob.GetBufferPointer(), blob.GetBufferSize(), null, &d3d11.fullscreen_pixel_shader);
+    if (hr < 0) goto defer;
+    blob.Release();
+    blob = null;
+
     d3d11.initted = true;
   }
 defer:
+  if (blob) blob.Release();
   if (hr != 0) d3d11_deinit();
 }
 
 void d3d11_deinit_swapchain() {
+  if (d3d11.resolved_backbuffer_view) d3d11.resolved_backbuffer_view.Release();
+  if (d3d11.resolved_backbuffer) d3d11.resolved_backbuffer.Release();
+  if (d3d11.multisampled_backbuffer_view) d3d11.multisampled_backbuffer_view.Release();
+  if (d3d11.multisampled_backbuffer) d3d11.multisampled_backbuffer.Release();
   if (d3d11.swapchain_backbuffer_view) d3d11.swapchain_backbuffer_view.Release();
 }
 
 void d3d11_deinit() {
   d3d11_deinit_swapchain();
+  if (d3d11.fullscreen_pixel_shader) d3d11.fullscreen_pixel_shader.Release();
+  if (d3d11.fullscreen_vertex_shader) d3d11.fullscreen_vertex_shader.Release();
+  if (d3d11.linear_sampler) d3d11.linear_sampler.Release();
   if (d3d11.ctx) d3d11.ctx.Release();
   if (d3d11.device) d3d11.device.Release();
   if (d3d11.swapchain) d3d11.swapchain.Release();
@@ -65,31 +144,75 @@ void d3d11_deinit() {
 }
 
 void d3d11_resize(u16[2] size) {
+  d3d11.size = size;
   HRESULT hr;
   ID3D11Texture2D* swapchain_backbuffer = void;
+  {
+    if (!d3d11.initted || size[0] == 0 || size[1] == 0) return;
 
-  if (!d3d11.initted) return;
+    d3d11_deinit_swapchain();
 
-  d3d11_deinit_swapchain();
+    hr = d3d11.swapchain.ResizeBuffers(1, size[0], size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
+    if (hr < 0) goto defer;
 
-  hr = d3d11.swapchain.ResizeBuffers(1, size[0], size[1], DXGI_FORMAT.UNKNOWN, DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH);
-  if (hr < 0) goto defer;
+    hr = d3d11.swapchain.GetBuffer(0, &swapchain_backbuffer.uuidof, cast(void**) &swapchain_backbuffer);
+    if (hr < 0) goto defer;
 
-  hr = d3d11.swapchain.GetBuffer(0, &swapchain_backbuffer.uuidof, cast(void**) &swapchain_backbuffer);
-  if (hr < 0) goto defer;
+    hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) swapchain_backbuffer, null, &d3d11.swapchain_backbuffer_view);
+    if (hr < 0) goto defer;
 
-  hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) swapchain_backbuffer, null, &d3d11.swapchain_backbuffer_view);
-  if (hr < 0) goto defer;
+    D3D11_TEXTURE2D_DESC multisampled_backbuffer_desc;
+    multisampled_backbuffer_desc.Width = size[0];
+    multisampled_backbuffer_desc.Height = size[1];
+    multisampled_backbuffer_desc.MipLevels = 1;
+    multisampled_backbuffer_desc.ArraySize = 1;
+    multisampled_backbuffer_desc.Format = DXGI_FORMAT.R16G16B16A16_FLOAT;
+    multisampled_backbuffer_desc.SampleDesc.Count = 8;
+    multisampled_backbuffer_desc.Usage = D3D11_USAGE.DEFAULT;
+    multisampled_backbuffer_desc.BindFlags = D3D11_BIND_FLAG.RENDER_TARGET;
+    hr = d3d11.device.CreateTexture2D(&multisampled_backbuffer_desc, null, &d3d11.multisampled_backbuffer);
+    if (hr < 0) goto defer;
 
+    hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) d3d11.multisampled_backbuffer, null, &d3d11.multisampled_backbuffer_view);
+    if (hr < 0) goto defer;
+
+    D3D11_TEXTURE2D_DESC resolved_backbuffer_desc = multisampled_backbuffer_desc;
+    resolved_backbuffer_desc.SampleDesc.Count = 1;
+    resolved_backbuffer_desc.BindFlags = D3D11_BIND_FLAG.SHADER_RESOURCE;
+    hr = d3d11.device.CreateTexture2D(&resolved_backbuffer_desc, null, &d3d11.resolved_backbuffer);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreateShaderResourceView(cast(ID3D11Resource*) d3d11.resolved_backbuffer, null, &d3d11.resolved_backbuffer_view);
+    if (hr < 0) goto defer;
+  }
 defer:
   if (swapchain_backbuffer) swapchain_backbuffer.Release();
   if (hr != 0) d3d11_deinit();
 }
 
 void d3d11_present(game.Game_Renderer* game_renderer) {
-  if (!d3d11.initted) return;
+  if (!d3d11.initted || d3d11.size[0] == 0 || d3d11.size[1] == 0) return;
 
-  d3d11.ctx.ClearRenderTargetView(d3d11.swapchain_backbuffer_view, game_renderer.clear_color0.ptr);
+  d3d11.ctx.ClearRenderTargetView(d3d11.multisampled_backbuffer_view, game_renderer.clear_color0.ptr);
+
+  d3d11.ctx.ResolveSubresource(cast(ID3D11Resource*) d3d11.resolved_backbuffer, 0, cast(ID3D11Resource*) d3d11.multisampled_backbuffer, 0, DXGI_FORMAT.R16G16B16A16_FLOAT);
+
+  d3d11.ctx.OMSetRenderTargets(1, &d3d11.swapchain_backbuffer_view, null);
+  d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
+  d3d11.ctx.IASetInputLayout(null);
+  d3d11.ctx.VSSetShader(d3d11.fullscreen_vertex_shader, null, 0);
+  d3d11.ctx.PSSetShader(d3d11.fullscreen_pixel_shader, null, 0);
+  d3d11.ctx.PSSetShaderResources(0, 1, &d3d11.resolved_backbuffer_view);
+  d3d11.ctx.PSSetSamplers(0, 1, &d3d11.linear_sampler);
+  D3D11_VIEWPORT viewport;
+  viewport.TopLeftX = 0.0;
+  viewport.TopLeftY = 0.0;
+  viewport.Width = d3d11.size[0];
+  viewport.Height = d3d11.size[1];
+  viewport.MinDepth = 0.0;
+  viewport.MaxDepth = 1.0;
+  d3d11.ctx.RSSetViewports(1, &viewport);
+  d3d11.ctx.Draw(3, 0);
 
   d3d11.swapchain.Present(0, 0);
 }
@@ -103,4 +226,5 @@ immutable d3d11_renderer = Platform_Renderer(
 
 version (DLL) mixin DLLExport!d3d11_renderer;
 
-pragma(lib, "d3d11");
+pragma(lib, "D3D11");
+pragma(lib, "D3DCompiler");

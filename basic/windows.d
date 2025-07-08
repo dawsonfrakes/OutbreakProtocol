@@ -1015,14 +1015,26 @@ enum D3D11_CREATE_DEVICE_FLAG : s32 {
   DISABLE_GPU_TIMEOUT = 0x100,
   VIDEO_SUPPORT = 0x800,
 }
+enum D3D11_BIND_FLAG : s32 {
+  VERTEX_BUFFER = 0x1,
+  INDEX_BUFFER = 0x2,
+  CONSTANT_BUFFER = 0x4,
+  SHADER_RESOURCE = 0x8,
+  STREAM_OUTPUT = 0x10,
+  RENDER_TARGET = 0x20,
+  DEPTH_STENCIL = 0x40,
+  UNORDERED_ACCESS = 0x80,
+  DECODER = 0x200,
+  VIDEO_ENCODER = 0x400,
+}
 struct ID3D11Device {
   struct VTable {
     IUnknown.VTable iunknown_vtable;
     alias this = iunknown_vtable;
     extern(Windows) HRESULT function(void*, const(D3D11_BUFFER_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Buffer**) CreateBuffer;
-    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE1D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture1D*) CreateTexture1D;
-    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE2D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture2D*) CreateTexture2D;
-    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE3D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture3D*) CreateTexture3D;
+    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE1D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture1D**) CreateTexture1D;
+    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE2D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture2D**) CreateTexture2D;
+    extern(Windows) HRESULT function(void*, const(D3D11_TEXTURE3D_DESC)*, const(D3D11_SUBRESOURCE_DATA)*, ID3D11Texture3D**) CreateTexture3D;
     extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_SHADER_RESOURCE_VIEW_DESC)*, ID3D11ShaderResourceView**) CreateShaderResourceView;
     extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_UNORDERED_ACCESS_VIEW_DESC)*, ID3D11UnorderedAccessView**) CreateUnorderedAccessView;
     extern(Windows) HRESULT function(void*, ID3D11Resource*, const(D3D11_RENDER_TARGET_VIEW_DESC)*, ID3D11RenderTargetView**) CreateRenderTargetView;
@@ -1784,4 +1796,62 @@ struct IDXGIAdapter {
     extern(Windows) HRESULT function(void*, GUID*, s64*) CheckInterfaceSupport;
   }
   mixin COMClass;
+}
+
+// d3dcompiler
+struct D3D_SHADER_MACRO {
+  const(char)* Name;
+  const(char)* Definition;
+}
+enum D3D_INCLUDE_TYPE : u32 {
+  LOCAL = 0,
+  SYSTEM = 1,
+  D3D10_LOCAL = 2,
+  D3D10_SYSTEM = 3,
+}
+enum D3DCOMPILE_FLAG : u32 {
+  DEBUG = 0,
+  SKIP_VALIDATION = 1,
+  SKIP_OPTIMIZATION = 2,
+  PACK_MATRIX_ROW_MAJOR = 3,
+  PACK_MATRIX_COLUMN_MAJOR = 4,
+  PARTIAL_PRECISION = 5,
+  FORCE_VS_SOFTWARE_NO_OPT = 6,
+  FORCE_PS_SOFTWARE_NO_OPT = 7,
+  NO_PRESHADER = 8,
+  AVOID_FLOW_CONTROL = 9,
+  PREFER_FLOW_CONTROL = 10,
+  ENABLE_STRICTNESS = 11,
+  ENABLE_BACKWARDS_COMPATIBILITY = 12,
+  IEEE_STRICTNESS = 13,
+  OPTIMIZATION_LEVEL0 = 14,
+  OPTIMIZATION_LEVEL3 = 15,
+  RESERVED16 = 16,
+  RESERVED17 = 17,
+  WARNINGS_ARE_ERRORS = 18,
+  RESOURCES_MAY_ALIAS = 19,
+  ENABLE_UNBOUNDED_DESCRIPTOR_TABLES = 20,
+  ALL_RESOURCES_BOUND = 21,
+  DEBUG_NAME_FOR_SOURCE = 22,
+  DEBUG_NAME_FOR_BINARY = 23,
+}
+struct ID3DInclude {
+  struct VTable {
+    extern(Windows) HRESULT function(void*, D3D_INCLUDE_TYPE, const(char)*, const(void)*, const(void)*, u32*) Open;
+    extern(Windows) HRESULT function(void*, const(void)*) Close;
+  }
+  mixin COMClass;
+}
+struct ID3DBlob {
+  struct VTable {
+    IUnknown.VTable iunknown_vtable;
+    alias this = iunknown_vtable;
+    extern(Windows) void* function(void*) GetBufferPointer;
+    extern(Windows) usize function(void*) GetBufferSize;
+  }
+  mixin COMClass;
+}
+
+@foreign("d3dcompiler") extern(Windows) {
+  HRESULT D3DCompile(const(void)*, usize, const(char)*, const(D3D_SHADER_MACRO)*, ID3DInclude*, const(char)*, const(char)*, u32, u32, ID3DBlob**, ID3DBlob**);
 }

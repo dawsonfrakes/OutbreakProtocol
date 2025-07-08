@@ -250,8 +250,8 @@ extern(Windows) noreturn WinMainCRTStartup() {
 extern(C) int _fltused;
 
 pragma(linkerDirective, "-subsystem:windows");
-pragma(lib, "kernel32");
-pragma(lib, "user32");
-pragma(lib, "ws2_32");
-pragma(lib, "dwmapi");
-pragma(lib, "winmm");
+pragma(lib, "Kernel32");
+pragma(lib, "User32");
+pragma(lib, "Ws2_32");
+pragma(lib, "Dwmapi");
+pragma(lib, "Winmm");
