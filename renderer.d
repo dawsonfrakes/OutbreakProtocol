@@ -7,7 +7,15 @@ enum Platform_Renderer_Bits : u32 {
 }
 
 struct Platform_Renderer {
-  void function() init_;
+  struct Init_Data {
+    version (Windows) {
+      import basic.windows : HWND;
+      HWND hwnd;
+    }
+    ushort[2] size;
+  }
+
+  void function(Init_Data*) init_;
   void function() deinit;
   void function() resize;
   void function() present;

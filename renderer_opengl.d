@@ -15,9 +15,12 @@ version (Windows) {
   void opengl_platform_present() {
 
   }
+
+  pragma(lib, "gdi32");
+  pragma(lib, "opengl32");
 }
 
-void opengl_init() {
+void opengl_init(Platform_Renderer.Init_Data* init_data) {
 
 }
 
