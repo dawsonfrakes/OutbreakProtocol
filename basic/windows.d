@@ -28,12 +28,40 @@ struct IUnknown {
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
 alias PROC = extern(Windows) ssize function();
+struct STARTUPINFOW {
+  u32 cb;
+  wchar* lpReserved;
+  wchar* lpDesktop;
+  wchar* lpTitle;
+  u32 dwX;
+  u32 dwY;
+  u32 dwXSize;
+  u32 dwYSize;
+  u32 dwXCountChars;
+  u32 dwYCountChars;
+  u32 dwFillAttribute;
+  u32 dwFlags;
+  u16 wShowWindow;
+  u16 cbReserved2;
+  u8* lpReserved2;
+  HANDLE hStdInput;
+  HANDLE hStdOutput;
+  HANDLE hStdError;
+}
+struct PROCESS_INFORMATION {
+  HANDLE hProcess;
+  HANDLE hThread;
+  u32 dwProcessId;
+  u32 dwThreadId;
+}
 
 @foreign("kernel32") extern(Windows) {
   HMODULE GetModuleHandleW(const(wchar)*);
   HMODULE LoadLibraryW(const(wchar)*);
   PROC GetProcAddress(HMODULE, const(char)*);
   s32 FreeLibrary(HMODULE);
+  s32 CreateProcessW(const(wchar)*, wchar*, void*, void*, s32, u32, void*, const(wchar)*, STARTUPINFOW*, PROCESS_INFORMATION*);
+  s32 CloseHandle(HANDLE);
   void Sleep(u32);
   noreturn ExitProcess(u32);
 }

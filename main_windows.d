@@ -22,8 +22,8 @@ __gshared {
 version (DLL) {
   void set_window_title_to_platform_renderer_name() {
     if (!platform_renderer_dll) SetWindowTextA(platform_hwnd, "Outbreak Protocol [NULL]");
-    else if (platform_renderer_name.length == "d3d11_renderer".length) SetWindowTextA(platform_hwnd, "Outbreak Protocol [D3D11]"); // @LengthHack
-    else if (platform_renderer_name.length == "opengl_renderer".length) SetWindowTextA(platform_hwnd, "Outbreak Protocol [OpenGL]");
+    else if (platform_renderer_name.length == "d3d11_renderer_".length) SetWindowTextA(platform_hwnd, "Outbreak Protocol [D3D11]"); // @LengthHack
+    else if (platform_renderer_name.length == "opengl_renderer_".length) SetWindowTextA(platform_hwnd, "Outbreak Protocol [OpenGL]");
   }
 
   void set_platform_renderer_from_dll(const(wchar)[] path, const(char)[] name) {
@@ -52,7 +52,17 @@ version (DLL) {
 
     platform_renderer.deinit();
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
-    // TODO(dfra): rebuild here!
+    { // do rebuild
+      __gshared wchar[256] cmdline;
+      foreach (usize i, c; "dmd -run build\0"w) cmdline.ptr[i] = c;
+      STARTUPINFOW startinfo = void;
+      startinfo.cb = STARTUPINFOW.sizeof;
+      PROCESS_INFORMATION procinfo = void;
+      if (CreateProcessW("dmd", cmdline.ptr, null, null, true, 0, null, null, &startinfo, &procinfo)) {
+        CloseHandle(procinfo.hThread);
+        CloseHandle(procinfo.hProcess);
+      }
+    }
     set_platform_renderer_from_dll(platform_renderer_path, platform_renderer_name);
     auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
     platform_renderer.init_(&init_data);
@@ -196,7 +206,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
               if (wParam == VK_F11) toggle_fullscreen();
               if (wParam == VK_RETURN && alt) toggle_fullscreen();
               version (DLL) if (wParam == VK_F6) {
-                if (platform_renderer_name.length == "opengl_renderer".length) // @LengthHack
+                if (platform_renderer_name.length == "opengl_renderer_".length) // @LengthHack
                   switch_to_renderer_in_dll(".build/renderer_d3d11.dll", "d3d11_renderer_");
                 else
                   switch_to_renderer_in_dll(".build/renderer_opengl.dll", "opengl_renderer_");
