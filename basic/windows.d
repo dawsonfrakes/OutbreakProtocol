@@ -25,6 +25,8 @@ struct IUnknown {
 }
 
 // kernel32
+enum INFINITE = 0xFFFFFFFF;
+
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
 alias PROC = extern(Windows) ssize function();
@@ -62,6 +64,8 @@ struct PROCESS_INFORMATION {
   s32 FreeLibrary(HMODULE);
   s32 CreateProcessW(const(wchar)*, wchar*, void*, void*, s32, u32, void*, const(wchar)*, STARTUPINFOW*, PROCESS_INFORMATION*);
   s32 CloseHandle(HANDLE);
+  s32 AllocConsole();
+  u32 WaitForSingleObject(HANDLE, u32);
   void Sleep(u32);
   noreturn ExitProcess(u32);
 }

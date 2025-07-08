@@ -53,12 +53,12 @@ version (DLL) {
     platform_renderer.deinit();
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
     { // do rebuild
-      __gshared wchar[256] cmdline;
-      foreach (usize i, c; "dmd -run build\0"w) cmdline.ptr[i] = c;
-      STARTUPINFOW startinfo = void;
+      __gshared wchar[16] cmdline = "dmd -run build\0";
+      STARTUPINFOW startinfo;
       startinfo.cb = STARTUPINFOW.sizeof;
       PROCESS_INFORMATION procinfo = void;
-      if (CreateProcessW("dmd", cmdline.ptr, null, null, true, 0, null, null, &startinfo, &procinfo)) {
+      if (CreateProcessW(null, cmdline.ptr, null, null, true, 0, null, null, &startinfo, &procinfo)) {
+        WaitForSingleObject(procinfo.hProcess, INFINITE);
         CloseHandle(procinfo.hThread);
         CloseHandle(procinfo.hProcess);
       }
@@ -109,6 +109,10 @@ void clear_held_keys() {
 
 extern(Windows) noreturn WinMainCRTStartup() {
   platform_hinstance = GetModuleHandleW(null);
+
+  debug {
+    AllocConsole();
+  }
 
   bool sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR;
 
