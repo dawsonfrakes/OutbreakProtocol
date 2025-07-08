@@ -15,23 +15,38 @@ __gshared D3D11_Data d3d11;
 
 void d3d11_init(Platform_Renderer.Init_Data* init_data) {
   HRESULT hr;
+  {
+    DXGI_SWAP_CHAIN_DESC swapchain_descriptor;
+    swapchain_descriptor.BufferDesc.Width = init_data.size[0];
+    swapchain_descriptor.BufferDesc.Height = init_data.size[1];
+    swapchain_descriptor.BufferDesc.Format = DXGI_FORMAT.R8G8B8A8_UNORM_SRGB;
+    swapchain_descriptor.SampleDesc.Count = 1;
+    swapchain_descriptor.BufferUsage = DXGI_USAGE.RENDER_TARGET_OUTPUT;
+    swapchain_descriptor.BufferCount = 1;
+    swapchain_descriptor.OutputWindow = init_data.hwnd;
+    swapchain_descriptor.Windowed = true;
+    swapchain_descriptor.Flags = DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH;
+    hr = D3D11CreateDeviceAndSwapChain(null, D3D_DRIVER_TYPE.HARDWARE, null,
+      D3D11_CREATE_DEVICE_FLAG.DEBUG, null, 0, D3D11_SDK_VERSION,
+      &swapchain_descriptor, &d3d11.swapchain, &d3d11.device, null, &d3d11.ctx);
+    if (hr < 0) goto defer;
 
-  DXGI_SWAP_CHAIN_DESC swapchain_descriptor;
-  swapchain_descriptor.BufferDesc.Width = init_data.size[0];
-  swapchain_descriptor.BufferDesc.Height = init_data.size[1];
-  swapchain_descriptor.BufferDesc.Format = DXGI_FORMAT.R8G8B8A8_UNORM_SRGB;
-  swapchain_descriptor.SampleDesc.Count = 1;
-  swapchain_descriptor.BufferUsage = DXGI_USAGE.RENDER_TARGET_OUTPUT;
-  swapchain_descriptor.BufferCount = 1;
-  swapchain_descriptor.OutputWindow = init_data.hwnd;
-  swapchain_descriptor.Windowed = true;
-  swapchain_descriptor.Flags = DXGI_SWAP_CHAIN_FLAG.ALLOW_MODE_SWITCH;
-  hr = D3D11CreateDeviceAndSwapChain(null, D3D_DRIVER_TYPE.HARDWARE, null,
-    D3D11_CREATE_DEVICE_FLAG.DEBUG, null, 0, D3D11_SDK_VERSION,
-    &swapchain_descriptor, &d3d11.swapchain, &d3d11.device, null, &d3d11.ctx);
-  if (hr < 0) goto defer;
+    IDXGIDevice* dxgi_device = void;
+    if (d3d11.swapchain.GetDevice(&IDXGIDevice.uuidof, cast(void**) &dxgi_device) >= 0) {
+      IDXGIAdapter* dxgi_adapter = void;
+      if (dxgi_device.GetAdapter(&dxgi_adapter) >= 0) {
+        IDXGIFactory* dxgi_factory = void;
+        if (dxgi_adapter.GetParent(&IDXGIFactory.uuidof, cast(void**) &dxgi_factory) >= 0) {
+          /*hr = */dxgi_factory.MakeWindowAssociation(init_data.hwnd, DXGI_MWA.NO_ALT_ENTER);
+          dxgi_factory.Release();
+        }
+        dxgi_adapter.Release();
+      }
+      dxgi_device.Release();
+    }
 
-  d3d11.initted = true;
+    d3d11.initted = true;
+  }
 defer:
   if (hr != 0) d3d11_deinit();
 }
@@ -72,8 +87,10 @@ defer:
 
 void d3d11_present() {
   if (!d3d11.initted) return;
+
   __gshared f32[4] clear_color0 = [0.6, 0.2, 0.2, 1.0];
   d3d11.ctx.ClearRenderTargetView(d3d11.swapchain_backbuffer_view, clear_color0.ptr);
+
   d3d11.swapchain.Present(0, 0);
 }
 

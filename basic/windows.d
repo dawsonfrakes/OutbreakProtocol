@@ -219,6 +219,57 @@ struct RAWINPUT {
   u32 GetRawInputData(HRAWINPUT, u32, void*, u32*, u32);
 }
 
+// gdi32
+enum PFD_DOUBLEBUFFER = 0x00000001;
+enum PFD_DRAW_TO_WINDOW = 0x00000004;
+enum PFD_SUPPORT_OPENGL = 0x00000020;
+enum PFD_DEPTH_DONTCARE = 0x20000000;
+
+struct PIXELFORMATDESCRIPTOR {
+  u16 nSize;
+  u16 nVersion;
+  u32 dwFlags;
+  u8 iPixelType;
+  u8 cColorBits;
+  u8 cRedBits;
+  u8 cRedShift;
+  u8 cGreenBits;
+  u8 cGreenShift;
+  u8 cBlueBits;
+  u8 cBlueShift;
+  u8 cAlphaBits;
+  u8 cAlphaShift;
+  u8 cAccumBits;
+  u8 cAccumRedBits;
+  u8 cAccumGreenBits;
+  u8 cAccumBlueBits;
+  u8 cAccumAlphaBits;
+  u8 cDepthBits;
+  u8 cStencilBits;
+  u8 cAuxBuffers;
+  u8 iLayerType;
+  u8 bReserved;
+  u32 dwLayerMask;
+  u32 dwVisibleMask;
+  u32 dwDamageMask;
+}
+
+@foreign("gdi32") extern(Windows) {
+  s32 ChoosePixelFormat(HDC, const(PIXELFORMATDESCRIPTOR)*);
+  s32 SetPixelFormat(HDC, s32, const(PIXELFORMATDESCRIPTOR)*);
+  s32 SwapBuffers(HDC);
+}
+
+// opengl32
+struct HGLRC__; alias HGLRC = HGLRC__*;
+
+@foreign("opengl32") extern(Windows) {
+  HGLRC wglCreateContext(HDC);
+  s32 wglDeleteContext(HGLRC);
+  s32 wglMakeCurrent(HDC, HGLRC);
+  PROC wglGetProcAddress(const(char)*);
+}
+
 // ws2_32
 enum WSADESCRIPTION_LEN = 256;
 enum WSASYS_STATUS_LEN = 128;
@@ -1588,6 +1639,19 @@ struct DXGI_SWAP_CHAIN_DESC {
   DXGI_SWAP_EFFECT SwapEffect;
   u32 Flags;
 }
+struct DXGI_SHARED_RESOURCE {
+  HANDLE Handle;
+}
+enum DXGI_RESIDENCY : s32 {
+  FULLY_RESIDENT = 1,
+  RESIDENT_IN_SHARED_MEMORY = 2,
+  EVICTED_TO_DISK = 3,
+}
+enum DXGI_MWA : s32 {
+  NO_WINDOW_CHANGES = 0,
+  NO_ALT_ENTER = 1,
+  NO_PRINT_SCREEN = 2,
+}
 struct IDXGIObject {
   struct VTable {
     IUnknown.VTable iunknown_vtable;
@@ -1596,6 +1660,32 @@ struct IDXGIObject {
     extern(Windows) HRESULT function(void*, GUID*, const(IUnknown)*) SetPrivateDataInterface;
     extern(Windows) HRESULT function(void*, GUID*, u32*, void*) GetPrivateData;
     extern(Windows) HRESULT function(void*, IID*, void**) GetParent;
+  }
+  mixin COMClass;
+}
+struct IDXGIFactory {
+  __gshared immutable uuidof = IID(0x7B7166EC, 0x21C7, 0x44AE, [0xB2, 0x1A, 0xC9, 0xAE, 0x32, 0x1A, 0xE3, 0x69]);
+  struct VTable {
+    IDXGIObject.VTable idxgiobject_vtable;
+    alias this = idxgiobject_vtable;
+    extern(Windows) HRESULT function(void*, u32, IDXGIAdapter**) EnumAdapters;
+    extern(Windows) HRESULT function(void*, HWND, u32) MakeWindowAssociation;
+    extern(Windows) HRESULT function(void*, HWND*) GetWindowAssociation;
+    extern(Windows) HRESULT function(void*, IUnknown*, DXGI_SWAP_CHAIN_DESC*, IDXGISwapChain**) CreateSwapChain;
+    extern(Windows) HRESULT function(void*, HMODULE, IDXGIAdapter**) CreateSoftwareAdapter;
+  }
+  mixin COMClass;
+}
+struct IDXGIDevice {
+  __gshared immutable uuidof = IID(0x54EC77FA, 0x1377, 0x44E6, [0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C]);
+  struct VTable {
+    IDXGIObject.VTable idxgiobject_vtable;
+    alias this = idxgiobject_vtable;
+    extern(Windows) HRESULT function(void*, IDXGIAdapter**) GetAdapter;
+    extern(Windows) HRESULT function(void*, const(DXGI_SURFACE_DESC)*, u32, DXGI_USAGE, const(DXGI_SHARED_RESOURCE)*, IDXGISurface**) CreateSurface;
+    extern(Windows) HRESULT function(void*, const(IUnknown*)*, DXGI_RESIDENCY*, u32) QueryResourceResidency;
+    extern(Windows) HRESULT function(void*, s32) SetGPUThreadPriority;
+    extern(Windows) HRESULT function(void*, s32*) GetGPUThreadPriority;
   }
   mixin COMClass;
 }

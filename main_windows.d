@@ -40,7 +40,7 @@ debug {
     platform_renderer.deinit();
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
     set_platform_renderer_from_dll(path, name);
-    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
+    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
     platform_renderer.init_(&init_data);
     platform_renderer.resize(platform_size);
   }
@@ -52,7 +52,7 @@ debug {
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
     // TODO(dfra): rebuild here!
     set_platform_renderer_from_dll(platform_renderer_path, platform_renderer_name);
-    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
+    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
     platform_renderer.init_(&init_data);
     platform_renderer.resize(platform_size);
   }
@@ -61,7 +61,7 @@ debug {
 void switch_renderer(immutable(Platform_Renderer)* renderer) {
   platform_renderer.deinit();
   platform_renderer = renderer;
-  auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
+  auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
   platform_renderer.init_(&init_data);
   platform_renderer.resize(platform_size);
 }
@@ -148,7 +148,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
           import renderer_d3d11 : d3d11_renderer;
           platform_renderer = &d3d11_renderer;
         }
-        auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, size: platform_size);
+        auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
         platform_renderer.init_(&init_data);
         return 0;
       case WM_DESTROY:

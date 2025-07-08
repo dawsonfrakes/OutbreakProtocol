@@ -9,8 +9,9 @@ enum Platform_Renderer_Bits : u32 {
 struct Platform_Renderer {
   struct Init_Data {
     version (Windows) {
-      import basic.windows : HWND;
+      import basic.windows : HWND, HDC;
       HWND hwnd;
+      HDC hdc;
     }
     ushort[2] size;
   }
