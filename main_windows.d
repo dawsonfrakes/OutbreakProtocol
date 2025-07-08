@@ -53,7 +53,7 @@ version (DLL) {
     platform_renderer.deinit();
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
     { // do rebuild
-      __gshared wchar[16] cmdline = "dmd -run build\0";
+      __gshared wchar[32] cmdline = "dmd -run build reload\0";
       STARTUPINFOW startinfo;
       startinfo.cb = STARTUPINFOW.sizeof;
       PROCESS_INFORMATION procinfo = void;

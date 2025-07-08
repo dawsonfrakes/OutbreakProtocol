@@ -12,6 +12,7 @@ void main(string[] args) {
   if (exit_code != 0) return;
   exit_code = "dmd -shared -main -i -version=DLL -betterC -g -gf -debug -of=.build/game.dll game.d -L=-noimplib -L=-noexp -L=-incremental:no".split.spawnProcess.wait;
   if (exit_code != 0) return;
+  if (args.length > 1 && args[1] == "reload") return;
 
   exit_code = "dmd -i -version=DLL -betterC -g -gf -debug -of=.build/OutbreakProtocol.exe main_windows.d renderer_null.d -L=-noimplib -L=-noexp -L=-incremental:no".split.spawnProcess.wait;
   if (exit_code != 0) return;
