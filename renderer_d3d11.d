@@ -1,7 +1,20 @@
 import basic;
+import basic.maths;
 import basic.windows;
 static import game;
 import renderer : Platform_Renderer;
+
+struct D3D11_Mesh_Vertex {
+  align(16) v3 position;
+  align(16) v3 normal;
+  align(16) v2 texcoord;
+  align(16) u32 texture_index;
+}
+
+struct D3D11_Mesh_Instance {
+  align(16) m4 world_transform;
+  align(16) m4 model_transform;
+}
 
 struct D3D11_Data {
   bool initted;
@@ -24,6 +37,13 @@ struct D3D11_Data {
   ID3D11ShaderResourceView* resolved_backbuffer_view;
   ID3D11Texture2D* depthbuffer;
   ID3D11DepthStencilView* depthbuffer_view;
+
+  ID3D11Buffer* mesh_vertex_buffer;
+  ID3D11Buffer* mesh_index_buffer;
+  ID3D11Buffer* mesh_instance_buffer;
+  ID3D11VertexShader* mesh_vertex_shader;
+  ID3D11PixelShader* mesh_pixel_shader;
+  ID3D11InputLayout* mesh_input_layout;
 }
 
 __gshared D3D11_Data d3d11;
@@ -82,35 +102,35 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
     if (hr < 0) goto defer;
 
     string fullscreen_source = `
-      struct VS_OUTPUT {
-        float4 position : SV_POSITION;
-        float2 texcoord : TEXCOORD0;
+      struct VOutput {
+        float4 position : SV_Position;
+        float2 texcoord : Texcoord0;
       };
 
-      VS_OUTPUT vmain(uint id : SV_VertexID) {
-        VS_OUTPUT output;
+      VOutput vmain(uint id : SV_VertexID) {
+        VOutput output;
         float2 position = float2((id << 1) & 2, id & 2);
-        output.position = float4(position * float2(2.0, -2.0) + float2(-1.0, 1.0), 0, 1);
+        output.position = float4(position * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), 0.0f, 1.0f);
         output.texcoord = position;
         return output;
       }
 
       float3 ACESFilm(float3 x) {
-        float a = 2.51;
-        float b = 0.03;
-        float c = 2.43;
-        float d = 0.59;
-        float e = 0.14;
+        float a = 2.51f;
+        float b = 0.03f;
+        float c = 2.43f;
+        float d = 0.59f;
+        float e = 0.14f;
         return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
       }
 
       Texture2D hdr_texture : register(t0);
       SamplerState linear_sampler : register(s0);
 
-      float4 pmain(VS_OUTPUT input) : SV_Target {
-          float3 hdr_color = hdr_texture.Sample(linear_sampler, input.texcoord).rgb;
-          // float3 tonemapped = ACESFilm(hdr_color);
-          return float4(hdr_color, 1.0);
+      float4 pmain(VOutput input) : SV_Target0 {
+        float3 hdr_color = hdr_texture.Sample(linear_sampler, input.texcoord).rgb;
+        // float3 tonemapped = ACESFilm(hdr_color);
+        return float4(hdr_color, 1.0f);
       }
     `;
 
@@ -130,6 +150,146 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
     blob.Release();
     blob = null;
 
+    string mesh_source = `
+      struct VInput {
+        float3 position : Position;
+        float3 normal : Normal;
+        float2 texcoord : Texcoord;
+        uint texture_index : Texture_Index;
+        matrix world_transform : World_Transform;
+        matrix model_transform : Model_Transform;
+      };
+
+      struct VOutput {
+        float4 position : SV_Position;
+        float3 normal : Normal;
+        float2 texcoord : Texcoord;
+      };
+
+      VOutput vmain(VInput input) {
+        VOutput output;
+        output.position = float4(input.position, 1.0f);
+        output.normal = input.normal;
+        output.texcoord = input.texcoord;
+        return output;
+      }
+
+      float4 pmain(VOutput input) : SV_Target0 {
+        return float4(input.texcoord, 0.0f, 1.0f);
+      }
+    `;
+
+    hr = D3DCompile(mesh_source.ptr, mesh_source.length, null, null, null, "vmain", "vs_5_0", D3DCOMPILE_FLAG.DEBUG, 0, &blob, null);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreateVertexShader(blob.GetBufferPointer(), blob.GetBufferSize(), null, &d3d11.mesh_vertex_shader);
+    if (hr < 0) goto defer;
+
+    D3D11_INPUT_ELEMENT_DESC[12] mesh_input_layout_desc;
+    mesh_input_layout_desc[0].SemanticName = "Position";
+    mesh_input_layout_desc[0].SemanticIndex = 0;
+    mesh_input_layout_desc[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
+    mesh_input_layout_desc[0].InputSlot = 0;
+    mesh_input_layout_desc[0].AlignedByteOffset = D3D11_Mesh_Vertex.position.offsetof;
+    mesh_input_layout_desc[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+    mesh_input_layout_desc[0].InstanceDataStepRate = 0;
+    mesh_input_layout_desc[1].SemanticName = "Normal";
+    mesh_input_layout_desc[1].SemanticIndex = 0;
+    mesh_input_layout_desc[1].Format = DXGI_FORMAT.R32G32B32_FLOAT;
+    mesh_input_layout_desc[1].InputSlot = 0;
+    mesh_input_layout_desc[1].AlignedByteOffset = D3D11_Mesh_Vertex.normal.offsetof;
+    mesh_input_layout_desc[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+    mesh_input_layout_desc[1].InstanceDataStepRate = 0;
+    mesh_input_layout_desc[2].SemanticName = "Texcoord";
+    mesh_input_layout_desc[2].SemanticIndex = 0;
+    mesh_input_layout_desc[2].Format = DXGI_FORMAT.R32G32_FLOAT;
+    mesh_input_layout_desc[2].InputSlot = 0;
+    mesh_input_layout_desc[2].AlignedByteOffset = D3D11_Mesh_Vertex.texcoord.offsetof;
+    mesh_input_layout_desc[2].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+    mesh_input_layout_desc[2].InstanceDataStepRate = 0;
+    mesh_input_layout_desc[3].SemanticName = "Texture_Index";
+    mesh_input_layout_desc[3].SemanticIndex = 0;
+    mesh_input_layout_desc[3].Format = DXGI_FORMAT.R32_UINT;
+    mesh_input_layout_desc[3].InputSlot = 0;
+    mesh_input_layout_desc[3].AlignedByteOffset = D3D11_Mesh_Vertex.texture_index.offsetof;
+    mesh_input_layout_desc[3].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
+    mesh_input_layout_desc[3].InstanceDataStepRate = 0;
+    enum world_transform_base = 4;
+    static foreach (i; world_transform_base..world_transform_base + 4) {
+      mesh_input_layout_desc[i].SemanticName = "World_Transform";
+      mesh_input_layout_desc[i].SemanticIndex = i - world_transform_base;
+      mesh_input_layout_desc[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
+      mesh_input_layout_desc[i].InputSlot = 1;
+      mesh_input_layout_desc[i].AlignedByteOffset = D3D11_Mesh_Instance.world_transform.offsetof + (i - world_transform_base) * v4.sizeof;
+      mesh_input_layout_desc[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
+      mesh_input_layout_desc[i].InstanceDataStepRate = 1;
+    }
+    enum model_transform_base = 8;
+    static foreach (i; model_transform_base..model_transform_base + 4) {
+      mesh_input_layout_desc[i].SemanticName = "Model_Transform";
+      mesh_input_layout_desc[i].SemanticIndex = i - model_transform_base;
+      mesh_input_layout_desc[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
+      mesh_input_layout_desc[i].InputSlot = 1;
+      mesh_input_layout_desc[i].AlignedByteOffset = D3D11_Mesh_Instance.model_transform.offsetof + (i - model_transform_base) * v4.sizeof;
+      mesh_input_layout_desc[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
+      mesh_input_layout_desc[i].InstanceDataStepRate = 1;
+    }
+    hr = d3d11.device.CreateInputLayout(mesh_input_layout_desc.ptr, cast(u32) mesh_input_layout_desc.length, blob.GetBufferPointer(), blob.GetBufferSize(), &d3d11.mesh_input_layout);
+    if (hr < 0) goto defer;
+
+    blob.Release();
+    blob = null;
+
+    hr = D3DCompile(mesh_source.ptr, mesh_source.length, null, null, null, "pmain", "ps_5_0", D3DCOMPILE_FLAG.DEBUG, 0, &blob, null);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreatePixelShader(blob.GetBufferPointer(), blob.GetBufferSize(), null, &d3d11.mesh_pixel_shader);
+    if (hr < 0) goto defer;
+    blob.Release();
+    blob = null;
+
+    __gshared D3D11_Mesh_Vertex[4] mesh_vertices = [
+      D3D11_Mesh_Vertex(position: v3(-0.5, -0.5, 0.0), texcoord: v2(0.0, 0.0)),
+      D3D11_Mesh_Vertex(position: v3(-0.5, +0.5, 0.0), texcoord: v2(0.0, 1.0)),
+      D3D11_Mesh_Vertex(position: v3(+0.5, +0.5, 0.0), texcoord: v2(1.0, 1.0)),
+      D3D11_Mesh_Vertex(position: v3(+0.5, -0.5, 0.0), texcoord: v2(1.0, 0.0)),
+    ];
+    __gshared u16[6] mesh_indices = [0, 1, 2, 2, 3, 0];
+    __gshared D3D11_Mesh_Instance[1] mesh_instances = [
+      D3D11_Mesh_Instance(world_transform: m4.identity, model_transform: m4.identity),
+    ];
+
+    D3D11_BUFFER_DESC mesh_vertex_buffer_desc;
+    mesh_vertex_buffer_desc.ByteWidth = mesh_vertices.length * mesh_vertices[0].sizeof;
+    mesh_vertex_buffer_desc.Usage = D3D11_USAGE.DEFAULT;
+    mesh_vertex_buffer_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+    mesh_vertex_buffer_desc.StructureByteStride = mesh_vertices[0].sizeof;
+    D3D11_SUBRESOURCE_DATA mesh_vertex_buffer_data;
+    mesh_vertex_buffer_data.pSysMem = mesh_vertices.ptr;
+    hr = d3d11.device.CreateBuffer(&mesh_vertex_buffer_desc, &mesh_vertex_buffer_data, &d3d11.mesh_vertex_buffer);
+    if (hr < 0) goto defer;
+
+    D3D11_BUFFER_DESC mesh_index_buffer_desc;
+    mesh_index_buffer_desc.ByteWidth = mesh_indices.length * mesh_indices[0].sizeof;
+    mesh_index_buffer_desc.Usage = D3D11_USAGE.DEFAULT;
+    mesh_index_buffer_desc.BindFlags = D3D11_BIND_FLAG.INDEX_BUFFER;
+    mesh_index_buffer_desc.StructureByteStride = mesh_indices[0].sizeof;
+    D3D11_SUBRESOURCE_DATA mesh_index_buffer_data;
+    mesh_index_buffer_data.pSysMem = mesh_indices.ptr;
+    hr = d3d11.device.CreateBuffer(&mesh_index_buffer_desc, &mesh_index_buffer_data, &d3d11.mesh_index_buffer);
+    if (hr < 0) goto defer;
+
+    D3D11_BUFFER_DESC mesh_instance_buffer_desc;
+    mesh_instance_buffer_desc.ByteWidth = mesh_instances.length * mesh_instances[0].sizeof;
+    mesh_instance_buffer_desc.Usage = D3D11_USAGE.DYNAMIC;
+    mesh_instance_buffer_desc.BindFlags = D3D11_BIND_FLAG.VERTEX_BUFFER;
+    mesh_instance_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.WRITE;
+    mesh_instance_buffer_desc.StructureByteStride = mesh_instances[0].sizeof;
+    D3D11_SUBRESOURCE_DATA mesh_instance_buffer_data;
+    mesh_instance_buffer_data.pSysMem = mesh_instances.ptr;
+    hr = d3d11.device.CreateBuffer(&mesh_instance_buffer_desc, &mesh_instance_buffer_data, &d3d11.mesh_instance_buffer);
+    if (hr < 0) goto defer;
+
     d3d11.initted = true;
   }
 defer:
@@ -148,6 +308,13 @@ void d3d11_deinit_swapchain() {
 }
 
 void d3d11_deinit() {
+  if (d3d11.mesh_vertex_shader) d3d11.mesh_vertex_shader.Release();
+  if (d3d11.mesh_pixel_shader) d3d11.mesh_pixel_shader.Release();
+  if (d3d11.mesh_input_layout) d3d11.mesh_input_layout.Release();
+  if (d3d11.mesh_instance_buffer) d3d11.mesh_instance_buffer.Release();
+  if (d3d11.mesh_index_buffer) d3d11.mesh_index_buffer.Release();
+  if (d3d11.mesh_vertex_buffer) d3d11.mesh_vertex_buffer.Release();
+
   d3d11_deinit_swapchain();
   if (d3d11.fullscreen_pixel_shader) d3d11.fullscreen_pixel_shader.Release();
   if (d3d11.fullscreen_vertex_shader) d3d11.fullscreen_vertex_shader.Release();
@@ -254,8 +421,27 @@ void d3d11_present(game.Game_Renderer* game_renderer) {
   d3d11.ctx.ClearRenderTargetView(d3d11.multisampled_backbuffer_view, game_renderer.clear_color0.ptr);
   d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
 
+  D3D11_VIEWPORT viewport;
+  viewport.TopLeftX = 0.0;
+  viewport.TopLeftY = 0.0;
+  viewport.Width = d3d11.size[0];
+  viewport.Height = d3d11.size[1];
+  viewport.MinDepth = 0.0;
+  viewport.MaxDepth = 1.0;
+  d3d11.ctx.RSSetViewports(1, &viewport);
   d3d11.ctx.OMSetRenderTargets(1, &d3d11.multisampled_backbuffer_view, d3d11.depthbuffer_view);
   d3d11.ctx.OMSetDepthStencilState(d3d11.depth_state, 0);
+
+  d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
+  ID3D11Buffer*[2] mesh_buffers = [d3d11.mesh_vertex_buffer, d3d11.mesh_instance_buffer];
+  u32[mesh_buffers.length] mesh_strides = [D3D11_Mesh_Vertex.sizeof, D3D11_Mesh_Instance.sizeof];
+  u32[mesh_buffers.length] mesh_offsets = [0, 0];
+  d3d11.ctx.IASetVertexBuffers(0, cast(u32) mesh_buffers.length, mesh_buffers.ptr, mesh_strides.ptr, mesh_offsets.ptr);
+  d3d11.ctx.IASetIndexBuffer(d3d11.mesh_index_buffer, DXGI_FORMAT.R16_UINT, 0);
+  d3d11.ctx.IASetInputLayout(d3d11.mesh_input_layout);
+  d3d11.ctx.VSSetShader(d3d11.mesh_vertex_shader, null, 0);
+  d3d11.ctx.PSSetShader(d3d11.mesh_pixel_shader, null, 0);
+  d3d11.ctx.DrawIndexedInstanced(6, 1, 0, 0, 0);
 
   d3d11.ctx.ResolveSubresource(cast(ID3D11Resource*) d3d11.resolved_backbuffer, 0, cast(ID3D11Resource*) d3d11.multisampled_backbuffer, 0, DXGI_FORMAT.R16G16B16A16_FLOAT);
 
@@ -266,14 +452,6 @@ void d3d11_present(game.Game_Renderer* game_renderer) {
   d3d11.ctx.PSSetShader(d3d11.fullscreen_pixel_shader, null, 0);
   d3d11.ctx.PSSetShaderResources(0, 1, &d3d11.resolved_backbuffer_view);
   d3d11.ctx.PSSetSamplers(0, 1, &d3d11.linear_sampler);
-  D3D11_VIEWPORT viewport;
-  viewport.TopLeftX = 0.0;
-  viewport.TopLeftY = 0.0;
-  viewport.Width = d3d11.size[0];
-  viewport.Height = d3d11.size[1];
-  viewport.MinDepth = 0.0;
-  viewport.MaxDepth = 1.0;
-  d3d11.ctx.RSSetViewports(1, &viewport);
   d3d11.ctx.Draw(3, 0);
 
   d3d11.swapchain.Present(0, 0);

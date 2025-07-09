@@ -1036,6 +1036,10 @@ enum D3D11_CLEAR_FLAG : s32 {
   DEPTH = 0x1,
   STENCIL = 0x2,
 }
+enum D3D11_CPU_ACCESS_FLAG : s32 {
+  WRITE = 0x10000,
+  READ = 0x20000,
+}
 struct ID3D11Device {
   struct VTable {
     IUnknown.VTable iunknown_vtable;
