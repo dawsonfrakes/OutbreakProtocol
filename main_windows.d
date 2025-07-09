@@ -12,6 +12,7 @@ __gshared {
   u16[2] platform_size;
   immutable(Platform_Renderer)* platform_renderer;
   debug {
+    HANDLE platform_stdin;
     HANDLE platform_stdout;
     HANDLE platform_stderr;
   }
@@ -125,6 +126,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
   debug {
     AllocConsole();
+    platform_stdin = GetStdHandle(STD_INPUT_HANDLE);
     platform_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
     platform_stderr = GetStdHandle(STD_ERROR_HANDLE);
   }
@@ -133,6 +135,16 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
   WSADATA wsadata = void;
   bool networking_supported = WSAStartup(0x202, &wsadata) == 0;
+
+  __gshared u8[64 * 1024 * 1024] buffer;
+  HANDLE file = CreateFileA("models/sponza.obj", GENERIC_READ, 0, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
+  if (file != INVALID_HANDLE_VALUE) {
+    s64 size = void;
+    GetFileSizeEx(file, &size);
+    u32 nread = void;
+    ReadFile(file, buffer.ptr, cast(u32) size, &nread, null);
+    CloseHandle(file);
+  }
 
   SetProcessDPIAware();
   WNDCLASSEXW wndclass;
@@ -260,6 +272,14 @@ extern(Windows) noreturn WinMainCRTStartup() {
   if (networking_supported) WSACleanup();
 
   ExitProcess(0);
+}
+
+debug extern(C) noreturn _assert(const(char)* exp, const(char)* file, u32 line) {
+  platform_log(file[0..strlen(file)]);
+  platform_log(exp[0..strlen(exp)]);
+  char buf = void;
+  ReadFile(platform_stdin, &buf, 1, null, null);
+  ExitProcess(1);
 }
 
 extern(C) int _fltused;

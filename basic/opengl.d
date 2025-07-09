@@ -140,5 +140,6 @@ enum GL_ZERO_TO_ONE = 0x935F;
   void glVertexArrayAttribFormat(u32, u32, s32, u32, bool, u32);
   void glCreateBuffers(u32, u32*);
   void glNamedBufferData(u32, usize, const(void)*, u32);
+  void glNamedBufferSubData(u32, ssize, usize, const(void)*);
   void glCreateTextures(u32, u32, u32*);
 }

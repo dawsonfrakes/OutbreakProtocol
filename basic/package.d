@@ -46,6 +46,22 @@ template DLLExport(alias data) {
   }
 }
 
+struct Bounded_Array(usize N_, T_) {
+  T_[N_] buffer;
+  usize length;
+
+  alias N = N_;
+  alias T = T_;
+
+  T_* ptr() => buffer.ptr;
+  T_[] opSlice() => buffer.ptr[0..length];
+
+  void opOpAssign(string op : "~")(T rhs) {
+    assert(length < buffer.length);
+    buffer.ptr[length++] = rhs;
+  }
+}
+
 auto min(Ts...)(Ts args) {
   auto smallest = args[0];
   static foreach (arg; args[1..$]) smallest = smallest < arg ? smallest : arg;
@@ -63,5 +79,11 @@ version (D_BetterC) {
     f32* pstart = p;
     for (f32* ptop = &p[count]; p < ptop; p += 1) *p = value;
     return pstart;
+  }
+
+  extern(C) usize strlen(const(char)* s) {
+    const(char)* start = s;
+    while (*s) s += 1;
+    return cast(usize) (start - s);
   }
 }

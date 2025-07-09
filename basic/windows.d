@@ -26,8 +26,13 @@ struct IUnknown {
 
 // kernel32
 enum INFINITE = 0xFFFFFFFF;
+enum STD_INPUT_HANDLE = -10;
 enum STD_OUTPUT_HANDLE = -11;
 enum STD_ERROR_HANDLE = -12;
+enum GENERIC_READ = 0x80000000;
+enum OPEN_EXISTING = 3;
+enum FILE_ATTRIBUTE_NORMAL = 128;
+enum INVALID_HANDLE_VALUE = cast(HANDLE) -1;
 
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
@@ -68,6 +73,8 @@ struct PROCESS_INFORMATION {
   s32 CloseHandle(HANDLE);
   s32 AllocConsole();
   HANDLE GetStdHandle(u32);
+  HANDLE CreateFileA(const(char)*, u32, u32, void*, u32, u32, HANDLE);
+  s32 GetFileSizeEx(HANDLE, s64*);
   s32 ReadFile(HANDLE, void*, u32, u32*, void*);
   s32 WriteFile(HANDLE, const(void)*, u32, u32*, void*);
   u32 WaitForSingleObject(HANDLE, u32);

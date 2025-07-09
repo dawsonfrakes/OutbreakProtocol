@@ -182,30 +182,30 @@ void opengl_init(Platform_Renderer.Init_Data* init_data) {
     glNamedBufferData(mesh_ebo, mesh_indices.length * mesh_indices[0].sizeof, mesh_indices.ptr, GL_STATIC_DRAW);
 
     glCreateBuffers(1, &opengl.mesh_ibo);
-    glNamedBufferData(opengl.mesh_ibo, mesh_instances.length * mesh_instances[0].sizeof, mesh_instances.ptr, GL_STATIC_DRAW);
+    glNamedBufferData(opengl.mesh_ibo, game.Game_Renderer.meshes.N * game.Game_Mesh_Instance.sizeof, null, GL_DYNAMIC_DRAW);
 
     u32 vbo_binding = 0;
     u32 ibo_binding = 1;
     glCreateVertexArrays(1, &opengl.mesh_vao);
-    glVertexArrayVertexBuffer(opengl.mesh_vao, vbo_binding, mesh_vbo, 0, Game_Mesh_Vertex.sizeof);
-    glVertexArrayVertexBuffer(opengl.mesh_vao, ibo_binding, opengl.mesh_ibo, 0, Game_Mesh_Instance.sizeof);
+    glVertexArrayVertexBuffer(opengl.mesh_vao, vbo_binding, mesh_vbo, 0, game.Game_Mesh_Vertex.sizeof);
+    glVertexArrayVertexBuffer(opengl.mesh_vao, ibo_binding, opengl.mesh_ibo, 0, game.Game_Mesh_Instance.sizeof);
     glVertexArrayBindingDivisor(opengl.mesh_vao, ibo_binding, 1);
     glVertexArrayElementBuffer(opengl.mesh_vao, mesh_ebo);
 
     u32 position_attrib = 0;
     glEnableVertexArrayAttrib(opengl.mesh_vao, position_attrib);
     glVertexArrayAttribBinding(opengl.mesh_vao, position_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.mesh_vao, position_attrib, 3, GL_FLOAT, false, Game_Mesh_Vertex.position.offsetof);
+    glVertexArrayAttribFormat(opengl.mesh_vao, position_attrib, 3, GL_FLOAT, false, game.Game_Mesh_Vertex.position.offsetof);
 
     u32 normal_attrib = 1;
     glEnableVertexArrayAttrib(opengl.mesh_vao, normal_attrib);
     glVertexArrayAttribBinding(opengl.mesh_vao, normal_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.mesh_vao, normal_attrib, 3, GL_FLOAT, false, Game_Mesh_Vertex.normal.offsetof);
+    glVertexArrayAttribFormat(opengl.mesh_vao, normal_attrib, 3, GL_FLOAT, false, game.Game_Mesh_Vertex.normal.offsetof);
 
     u32 texcoord_attrib = 2;
     glEnableVertexArrayAttrib(opengl.mesh_vao, texcoord_attrib);
     glVertexArrayAttribBinding(opengl.mesh_vao, texcoord_attrib, vbo_binding);
-    glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, Game_Mesh_Vertex.texcoord.offsetof);
+    glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, game.Game_Mesh_Vertex.texcoord.offsetof);
   }
 }
 
@@ -241,6 +241,8 @@ void opengl_present(game.Game_Renderer* game_renderer) {
   if (!opengl.initted || opengl.size[0] == 0 || opengl.size[1] == 0) return;
 
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
+
+  glNamedBufferSubData(opengl.mesh_ibo, 0, game_renderer.meshes.length * game.Game_Mesh_Instance.sizeof, game_renderer.meshes.ptr);
 
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
   glViewport(0, 0, opengl.size[0], opengl.size[1]);
