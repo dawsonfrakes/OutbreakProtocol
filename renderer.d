@@ -15,6 +15,7 @@ struct Platform_Renderer {
       HDC hdc;
     }
     u16[2] size;
+    void function(const(char)[]) log;
   }
 
   void function(Init_Data*) init_;

@@ -61,6 +61,7 @@ enum GL_REPEAT = 0x2901;
   void glFrontFace(u32);
   void glBlendFunc(u32, u32);
   void glPolygonMode(u32, u32);
+  void glViewport(s32, s32, u32, u32);
   void glClear(u32);
   void glClearColor(f32, f32, f32, f32);
 }

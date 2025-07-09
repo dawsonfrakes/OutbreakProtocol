@@ -5,11 +5,14 @@ import renderer : Platform_Renderer;
 
 struct D3D11_Data {
   bool initted;
+  void function(const(char)[]) log;
   u16[2] size;
+
   IDXGISwapChain* swapchain;
   ID3D11Device* device;
   ID3D11DeviceContext* ctx;
 
+  ID3D11DepthStencilState* depth_state;
   ID3D11SamplerState* linear_sampler;
   ID3D11VertexShader* fullscreen_vertex_shader;
   ID3D11PixelShader* fullscreen_pixel_shader;
@@ -19,11 +22,14 @@ struct D3D11_Data {
   ID3D11RenderTargetView* multisampled_backbuffer_view;
   ID3D11Texture2D* resolved_backbuffer;
   ID3D11ShaderResourceView* resolved_backbuffer_view;
+  ID3D11Texture2D* depthbuffer;
+  ID3D11DepthStencilView* depthbuffer_view;
 }
 
 __gshared D3D11_Data d3d11;
 
 void d3d11_init(Platform_Renderer.Init_Data* init_data) {
+  d3d11.log = init_data.log;
   HRESULT hr;
   ID3DBlob* blob;
   {
@@ -55,6 +61,13 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
       }
       dxgi_device.Release();
     }
+
+    D3D11_DEPTH_STENCIL_DESC depth_state_desc;
+    depth_state_desc.DepthEnable = true;
+    depth_state_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK.ALL;
+    depth_state_desc.DepthFunc = D3D11_COMPARISON_FUNC.LESS_EQUAL;
+    hr = d3d11.device.CreateDepthStencilState(&depth_state_desc, &d3d11.depth_state);
+    if (hr < 0) goto defer;
 
     D3D11_SAMPLER_DESC linear_sampler_desc;
     linear_sampler_desc.Filter = D3D11_FILTER.MIN_MAG_MIP_LINEAR;
@@ -125,6 +138,8 @@ defer:
 }
 
 void d3d11_deinit_swapchain() {
+  if (d3d11.depthbuffer_view) d3d11.depthbuffer_view.Release();
+  if (d3d11.depthbuffer) d3d11.depthbuffer.Release();
   if (d3d11.resolved_backbuffer_view) d3d11.resolved_backbuffer_view.Release();
   if (d3d11.resolved_backbuffer) d3d11.resolved_backbuffer.Release();
   if (d3d11.multisampled_backbuffer_view) d3d11.multisampled_backbuffer_view.Release();
@@ -137,6 +152,7 @@ void d3d11_deinit() {
   if (d3d11.fullscreen_pixel_shader) d3d11.fullscreen_pixel_shader.Release();
   if (d3d11.fullscreen_vertex_shader) d3d11.fullscreen_vertex_shader.Release();
   if (d3d11.linear_sampler) d3d11.linear_sampler.Release();
+  if (d3d11.depth_state) d3d11.depth_state.Release();
   if (d3d11.ctx) d3d11.ctx.Release();
   if (d3d11.device) d3d11.device.Release();
   if (d3d11.swapchain) d3d11.swapchain.Release();
@@ -161,19 +177,61 @@ void d3d11_resize(u16[2] size) {
     hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) swapchain_backbuffer, null, &d3d11.swapchain_backbuffer_view);
     if (hr < 0) goto defer;
 
+    u32 color_samples_max = 1;
+    for (u32 i = 16; i > 1; i >>= 1) {
+      u32 quality_levels = void;
+      hr = d3d11.device.CheckMultisampleQualityLevels(DXGI_FORMAT.R16G16B16A16_FLOAT, i, &quality_levels);
+      if (hr < 0) goto defer;
+      if (quality_levels > 0) {
+        color_samples_max = i;
+        break;
+      }
+    }
+    u32 depth_samples_max = 1;
+    for (u32 i = 16; i > 1; i >>= 1) {
+      u32 quality_levels = void;
+      hr = d3d11.device.CheckMultisampleQualityLevels(DXGI_FORMAT.D32_FLOAT, i, &quality_levels);
+      if (hr < 0) goto defer;
+      if (quality_levels > 0) {
+        depth_samples_max = i;
+        break;
+      }
+    }
+    u32 samples = max(color_samples_max, depth_samples_max);
+    if (samples == 16) d3d11.log("Samples: 16"); // @StringFormatting
+    else if (samples == 8) d3d11.log("Samples: 8");
+    else if (samples == 4) d3d11.log("Samples: 4");
+    else if (samples == 2) d3d11.log("Samples: 2");
+    else if (samples == 1) d3d11.log("Samples: 1");
+
     D3D11_TEXTURE2D_DESC multisampled_backbuffer_desc;
     multisampled_backbuffer_desc.Width = size[0];
     multisampled_backbuffer_desc.Height = size[1];
     multisampled_backbuffer_desc.MipLevels = 1;
     multisampled_backbuffer_desc.ArraySize = 1;
     multisampled_backbuffer_desc.Format = DXGI_FORMAT.R16G16B16A16_FLOAT;
-    multisampled_backbuffer_desc.SampleDesc.Count = 8;
+    multisampled_backbuffer_desc.SampleDesc.Count = samples;
     multisampled_backbuffer_desc.Usage = D3D11_USAGE.DEFAULT;
     multisampled_backbuffer_desc.BindFlags = D3D11_BIND_FLAG.RENDER_TARGET;
     hr = d3d11.device.CreateTexture2D(&multisampled_backbuffer_desc, null, &d3d11.multisampled_backbuffer);
     if (hr < 0) goto defer;
 
     hr = d3d11.device.CreateRenderTargetView(cast(ID3D11Resource*) d3d11.multisampled_backbuffer, null, &d3d11.multisampled_backbuffer_view);
+    if (hr < 0) goto defer;
+
+    D3D11_TEXTURE2D_DESC depthbuffer_desc;
+    depthbuffer_desc.Width = size[0];
+    depthbuffer_desc.Height = size[1];
+    depthbuffer_desc.MipLevels = 1;
+    depthbuffer_desc.ArraySize = 1;
+    depthbuffer_desc.Format = DXGI_FORMAT.D32_FLOAT;
+    depthbuffer_desc.SampleDesc.Count = samples;
+    depthbuffer_desc.Usage = D3D11_USAGE.DEFAULT;
+    depthbuffer_desc.BindFlags = D3D11_BIND_FLAG.DEPTH_STENCIL;
+    hr = d3d11.device.CreateTexture2D(&depthbuffer_desc, null, &d3d11.depthbuffer);
+    if (hr < 0) goto defer;
+
+    hr = d3d11.device.CreateDepthStencilView(cast(ID3D11Resource*) d3d11.depthbuffer, null, &d3d11.depthbuffer_view);
     if (hr < 0) goto defer;
 
     D3D11_TEXTURE2D_DESC resolved_backbuffer_desc = multisampled_backbuffer_desc;
@@ -194,6 +252,10 @@ void d3d11_present(game.Game_Renderer* game_renderer) {
   if (!d3d11.initted || d3d11.size[0] == 0 || d3d11.size[1] == 0) return;
 
   d3d11.ctx.ClearRenderTargetView(d3d11.multisampled_backbuffer_view, game_renderer.clear_color0.ptr);
+  d3d11.ctx.ClearDepthStencilView(d3d11.depthbuffer_view, D3D11_CLEAR_FLAG.DEPTH, 0.0, cast(u8) 0);
+
+  d3d11.ctx.OMSetRenderTargets(1, &d3d11.multisampled_backbuffer_view, d3d11.depthbuffer_view);
+  d3d11.ctx.OMSetDepthStencilState(d3d11.depth_state, 0);
 
   d3d11.ctx.ResolveSubresource(cast(ID3D11Resource*) d3d11.resolved_backbuffer, 0, cast(ID3D11Resource*) d3d11.multisampled_backbuffer, 0, DXGI_FORMAT.R16G16B16A16_FLOAT);
 

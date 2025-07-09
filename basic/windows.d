@@ -26,6 +26,8 @@ struct IUnknown {
 
 // kernel32
 enum INFINITE = 0xFFFFFFFF;
+enum STD_OUTPUT_HANDLE = -11;
+enum STD_ERROR_HANDLE = -12;
 
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
@@ -65,6 +67,9 @@ struct PROCESS_INFORMATION {
   s32 CreateProcessW(const(wchar)*, wchar*, void*, void*, s32, u32, void*, const(wchar)*, STARTUPINFOW*, PROCESS_INFORMATION*);
   s32 CloseHandle(HANDLE);
   s32 AllocConsole();
+  HANDLE GetStdHandle(u32);
+  s32 ReadFile(HANDLE, void*, u32, u32*, void*);
+  s32 WriteFile(HANDLE, const(void)*, u32, u32*, void*);
   u32 WaitForSingleObject(HANDLE, u32);
   void Sleep(u32);
   noreturn ExitProcess(u32);
@@ -1026,6 +1031,10 @@ enum D3D11_BIND_FLAG : s32 {
   UNORDERED_ACCESS = 0x80,
   DECODER = 0x200,
   VIDEO_ENCODER = 0x400,
+}
+enum D3D11_CLEAR_FLAG : s32 {
+  DEPTH = 0x1,
+  STENCIL = 0x2,
 }
 struct ID3D11Device {
   struct VTable {

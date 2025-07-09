@@ -92,6 +92,7 @@ version (Windows) {
 
 struct OpenGL_Data {
   bool initted;
+  void function(const(char)[]) log;
   u16[2] size;
 
   u32 main_fbo;
@@ -103,6 +104,7 @@ __gshared OpenGL_Data opengl;
 
 void opengl_init(Platform_Renderer.Init_Data* init_data) {
   opengl.initted = opengl_platform_init(init_data);
+  opengl.log = init_data.log;
 
   glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 
@@ -124,7 +126,13 @@ void opengl_resize(u16[2] size) {
   glGetIntegerv(GL_MAX_COLOR_TEXTURE_SAMPLES, &fbo_color_samples_max);
   s32 fbo_depth_samples_max = void;
   glGetIntegerv(GL_MAX_DEPTH_TEXTURE_SAMPLES, &fbo_depth_samples_max);
-  u32 fbo_samples = cast(u32) max(0, min(fbo_color_samples_max, fbo_depth_samples_max));
+  u32 fbo_samples = cast(u32) max(1, min(fbo_color_samples_max, fbo_depth_samples_max, 16));
+
+  if (fbo_samples == 16) opengl.log("Samples: 16"); // @StringFormatting
+  else if (fbo_samples == 8) opengl.log("Samples: 8");
+  else if (fbo_samples == 4) opengl.log("Samples: 4");
+  else if (fbo_samples == 2) opengl.log("Samples: 2");
+  else if (fbo_samples == 1) opengl.log("Samples: 1");
 
   glNamedRenderbufferStorageMultisample(opengl.main_fbo_color0, fbo_samples, GL_RGBA16F, size[0], size[1]);
   glNamedFramebufferRenderbuffer(opengl.main_fbo, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, opengl.main_fbo_color0);
@@ -139,6 +147,9 @@ void opengl_present(game.Game_Renderer* game_renderer) {
   glClearNamedFramebufferfv(opengl.main_fbo, GL_COLOR, 0, game_renderer.clear_color0.ptr);
 
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
+  glViewport(0, 0, opengl.size[0], opengl.size[1]);
+  glDepthFunc(GL_LEQUAL);
+  glEnable(GL_DEPTH_TEST);
 
   glClear(0); // NOTE(dfra): this fixes intel default framebuffer resize bug.
 

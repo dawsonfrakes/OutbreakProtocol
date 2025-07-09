@@ -1,10 +1,9 @@
 import basic;
 import basic.windows;
+static import game;
 
 import renderer : Platform_Renderer;
 import renderer_null : null_renderer;
-
-static import game;
 
 __gshared {
   HINSTANCE platform_hinstance;
@@ -12,6 +11,10 @@ __gshared {
   HDC platform_hdc;
   u16[2] platform_size;
   immutable(Platform_Renderer)* platform_renderer;
+  debug {
+    HANDLE platform_stdout;
+    HANDLE platform_stderr;
+  }
   version (DLL) {
     HMODULE platform_renderer_dll;
     const(wchar)[] platform_renderer_path; // NOTE(dfra): path and name are only valid if dll is not null.
@@ -33,6 +36,7 @@ version (DLL) {
       platform_renderer_name = name;
       platform_renderer = cast(immutable(Platform_Renderer)*) GetProcAddress(platform_renderer_dll, name.ptr);
       set_window_title_to_platform_renderer_name();
+      platform_log("Switching API");
     } else {
       platform_renderer = &null_renderer;
     }
@@ -42,12 +46,12 @@ version (DLL) {
     platform_renderer.deinit();
     if (platform_renderer_dll) FreeLibrary(platform_renderer_dll);
     set_platform_renderer_from_dll(path, name);
-    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
+    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size, log: &platform_log);
     platform_renderer.init_(&init_data);
     platform_renderer.resize(platform_size);
   }
 
-  void reload_dll_renderer() {
+  void rebuild_dll_renderer() {
     if (!platform_renderer_dll) return;
 
     platform_renderer.deinit();
@@ -64,16 +68,25 @@ version (DLL) {
       }
     }
     set_platform_renderer_from_dll(platform_renderer_path, platform_renderer_name);
-    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
+    auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size, log: &platform_log);
     platform_renderer.init_(&init_data);
     platform_renderer.resize(platform_size);
+  }
+}
+
+void platform_log(const(char)[] s) {
+  debug {
+    string prefix = "LOG: ";
+    WriteFile(platform_stdout, prefix.ptr, cast(u32) prefix.length, null, null);
+    WriteFile(platform_stdout, s.ptr, cast(u32) s.length, null, null);
+    WriteFile(platform_stdout, "\n".ptr, 1, null, null);
   }
 }
 
 void switch_renderer(immutable(Platform_Renderer)* renderer) {
   platform_renderer.deinit();
   platform_renderer = renderer;
-  auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
+  auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size, log: &platform_log);
   platform_renderer.init_(&init_data);
   platform_renderer.resize(platform_size);
 }
@@ -112,6 +125,8 @@ extern(Windows) noreturn WinMainCRTStartup() {
 
   debug {
     AllocConsole();
+    platform_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    platform_stderr = GetStdHandle(STD_ERROR_HANDLE);
   }
 
   bool sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR;
@@ -164,7 +179,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
           import renderer_d3d11 : d3d11_renderer;
           platform_renderer = &d3d11_renderer;
         }
-        auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size);
+        auto init_data = Platform_Renderer.Init_Data(hwnd: platform_hwnd, hdc: platform_hdc, size: platform_size, log: &platform_log);
         platform_renderer.init_(&init_data);
         return 0;
       case WM_DESTROY:
@@ -215,7 +230,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
                 else
                   switch_to_renderer_in_dll(".build/renderer_opengl.dll", "opengl_renderer_");
               }
-              version (DLL) if (wParam == VK_F7) reload_dll_renderer();
+              version (DLL) if (wParam == VK_F7) rebuild_dll_renderer();
             }
           }
           break;
