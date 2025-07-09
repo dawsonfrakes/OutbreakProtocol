@@ -66,7 +66,18 @@ enum GL_REPEAT = 0x2901;
   void glClearColor(f32, f32, f32, f32);
 }
 
+// 1.1
+@gl_version(1, 1) extern(System) {
+  void glDrawElements(u32, u32, u32, const(void)*);
+}
+
+// 1.5
+enum GL_STATIC_DRAW = 0x88E4;
+enum GL_DYNAMIC_DRAW = 0x88E8;
+
 // 2.0
+enum GL_FRAGMENT_SHADER = 0x8B30;
+enum GL_VERTEX_SHADER = 0x8B31;
 enum GL_LOWER_LEFT = 0x8CA1;
 
 @gl_version(2, 0) extern(System) {
@@ -100,6 +111,15 @@ enum GL_FRAMEBUFFER_SRGB = 0x8DB9;
 enum GL_MAX_COLOR_TEXTURE_SAMPLES = 0x910E;
 enum GL_MAX_DEPTH_TEXTURE_SAMPLES = 0x910F;
 
+// 4.3
+enum GL_DEBUG_OUTPUT = 0x92E0;
+
+alias GLDEBUGPROC = extern(System) void function(u32, u32, u32, u32, u32, const(char)*, const(void)*);
+
+@gl_version(4, 3) extern(System) {
+  void glDebugMessageCallback(GLDEBUGPROC, const(void)*);
+}
+
 // 4.5
 enum GL_ZERO_TO_ONE = 0x935F;
 
@@ -112,6 +132,13 @@ enum GL_ZERO_TO_ONE = 0x935F;
   void glCreateRenderbuffers(u32, u32*);
   void glNamedRenderbufferStorageMultisample(u32, u32, u32, u32, u32);
   void glCreateVertexArrays(u32, u32*);
+  void glVertexArrayVertexBuffer(u32, u32, u32, ssize, u32);
+  void glVertexArrayElementBuffer(u32, u32);
+  void glVertexArrayBindingDivisor(u32, u32, u32);
+  void glEnableVertexArrayAttrib(u32, u32);
+  void glVertexArrayAttribBinding(u32, u32, u32);
+  void glVertexArrayAttribFormat(u32, u32, s32, u32, bool, u32);
   void glCreateBuffers(u32, u32*);
+  void glNamedBufferData(u32, usize, const(void)*, u32);
   void glCreateTextures(u32, u32, u32*);
 }

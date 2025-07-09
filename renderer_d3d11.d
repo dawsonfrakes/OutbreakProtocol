@@ -3,18 +3,7 @@ import basic.maths;
 import basic.windows;
 static import game;
 import renderer : Platform_Renderer;
-
-struct D3D11_Mesh_Vertex {
-  align(16) v3 position;
-  align(16) v3 normal;
-  align(16) v2 texcoord;
-  align(16) u32 texture_index;
-}
-
-struct D3D11_Mesh_Instance {
-  align(16) m4 world_transform;
-  align(16) m4 model_transform;
-}
+import static_meshes;
 
 struct D3D11_Data {
   bool initted;
@@ -190,28 +179,28 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
     mesh_input_layout_desc[0].SemanticIndex = 0;
     mesh_input_layout_desc[0].Format = DXGI_FORMAT.R32G32B32_FLOAT;
     mesh_input_layout_desc[0].InputSlot = 0;
-    mesh_input_layout_desc[0].AlignedByteOffset = D3D11_Mesh_Vertex.position.offsetof;
+    mesh_input_layout_desc[0].AlignedByteOffset = Game_Mesh_Vertex.position.offsetof;
     mesh_input_layout_desc[0].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
     mesh_input_layout_desc[0].InstanceDataStepRate = 0;
     mesh_input_layout_desc[1].SemanticName = "Normal";
     mesh_input_layout_desc[1].SemanticIndex = 0;
     mesh_input_layout_desc[1].Format = DXGI_FORMAT.R32G32B32_FLOAT;
     mesh_input_layout_desc[1].InputSlot = 0;
-    mesh_input_layout_desc[1].AlignedByteOffset = D3D11_Mesh_Vertex.normal.offsetof;
+    mesh_input_layout_desc[1].AlignedByteOffset = Game_Mesh_Vertex.normal.offsetof;
     mesh_input_layout_desc[1].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
     mesh_input_layout_desc[1].InstanceDataStepRate = 0;
     mesh_input_layout_desc[2].SemanticName = "Texcoord";
     mesh_input_layout_desc[2].SemanticIndex = 0;
     mesh_input_layout_desc[2].Format = DXGI_FORMAT.R32G32_FLOAT;
     mesh_input_layout_desc[2].InputSlot = 0;
-    mesh_input_layout_desc[2].AlignedByteOffset = D3D11_Mesh_Vertex.texcoord.offsetof;
+    mesh_input_layout_desc[2].AlignedByteOffset = Game_Mesh_Vertex.texcoord.offsetof;
     mesh_input_layout_desc[2].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
     mesh_input_layout_desc[2].InstanceDataStepRate = 0;
     mesh_input_layout_desc[3].SemanticName = "Texture_Index";
     mesh_input_layout_desc[3].SemanticIndex = 0;
     mesh_input_layout_desc[3].Format = DXGI_FORMAT.R32_UINT;
     mesh_input_layout_desc[3].InputSlot = 0;
-    mesh_input_layout_desc[3].AlignedByteOffset = D3D11_Mesh_Vertex.texture_index.offsetof;
+    mesh_input_layout_desc[3].AlignedByteOffset = Game_Mesh_Vertex.texture_index.offsetof;
     mesh_input_layout_desc[3].InputSlotClass = D3D11_INPUT_CLASSIFICATION.VERTEX_DATA;
     mesh_input_layout_desc[3].InstanceDataStepRate = 0;
     enum world_transform_base = 4;
@@ -220,7 +209,7 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
       mesh_input_layout_desc[i].SemanticIndex = i - world_transform_base;
       mesh_input_layout_desc[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
       mesh_input_layout_desc[i].InputSlot = 1;
-      mesh_input_layout_desc[i].AlignedByteOffset = D3D11_Mesh_Instance.world_transform.offsetof + (i - world_transform_base) * v4.sizeof;
+      mesh_input_layout_desc[i].AlignedByteOffset = Game_Mesh_Instance.world_transform.offsetof + (i - world_transform_base) * v4.sizeof;
       mesh_input_layout_desc[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
       mesh_input_layout_desc[i].InstanceDataStepRate = 1;
     }
@@ -230,7 +219,7 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
       mesh_input_layout_desc[i].SemanticIndex = i - model_transform_base;
       mesh_input_layout_desc[i].Format = DXGI_FORMAT.R32G32B32A32_FLOAT;
       mesh_input_layout_desc[i].InputSlot = 1;
-      mesh_input_layout_desc[i].AlignedByteOffset = D3D11_Mesh_Instance.model_transform.offsetof + (i - model_transform_base) * v4.sizeof;
+      mesh_input_layout_desc[i].AlignedByteOffset = Game_Mesh_Instance.model_transform.offsetof + (i - model_transform_base) * v4.sizeof;
       mesh_input_layout_desc[i].InputSlotClass = D3D11_INPUT_CLASSIFICATION.INSTANCE_DATA;
       mesh_input_layout_desc[i].InstanceDataStepRate = 1;
     }
@@ -247,17 +236,6 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
     if (hr < 0) goto defer;
     blob.Release();
     blob = null;
-
-    __gshared D3D11_Mesh_Vertex[4] mesh_vertices = [
-      D3D11_Mesh_Vertex(position: v3(-0.5, -0.5, 0.0), texcoord: v2(0.0, 0.0)),
-      D3D11_Mesh_Vertex(position: v3(-0.5, +0.5, 0.0), texcoord: v2(0.0, 1.0)),
-      D3D11_Mesh_Vertex(position: v3(+0.5, +0.5, 0.0), texcoord: v2(1.0, 1.0)),
-      D3D11_Mesh_Vertex(position: v3(+0.5, -0.5, 0.0), texcoord: v2(1.0, 0.0)),
-    ];
-    __gshared u16[6] mesh_indices = [0, 1, 2, 2, 3, 0];
-    __gshared D3D11_Mesh_Instance[1] mesh_instances = [
-      D3D11_Mesh_Instance(world_transform: m4.identity, model_transform: m4.identity),
-    ];
 
     D3D11_BUFFER_DESC mesh_vertex_buffer_desc;
     mesh_vertex_buffer_desc.ByteWidth = mesh_vertices.length * mesh_vertices[0].sizeof;
@@ -434,7 +412,7 @@ void d3d11_present(game.Game_Renderer* game_renderer) {
 
   d3d11.ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY.TRIANGLELIST);
   ID3D11Buffer*[2] mesh_buffers = [d3d11.mesh_vertex_buffer, d3d11.mesh_instance_buffer];
-  u32[mesh_buffers.length] mesh_strides = [D3D11_Mesh_Vertex.sizeof, D3D11_Mesh_Instance.sizeof];
+  u32[mesh_buffers.length] mesh_strides = [Game_Mesh_Vertex.sizeof, Game_Mesh_Instance.sizeof];
   u32[mesh_buffers.length] mesh_offsets = [0, 0];
   d3d11.ctx.IASetVertexBuffers(0, cast(u32) mesh_buffers.length, mesh_buffers.ptr, mesh_strides.ptr, mesh_offsets.ptr);
   d3d11.ctx.IASetIndexBuffer(d3d11.mesh_index_buffer, DXGI_FORMAT.R16_UINT, 0);

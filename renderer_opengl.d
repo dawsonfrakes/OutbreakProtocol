@@ -1,6 +1,7 @@
 import basic;
 static import game;
 import renderer : Platform_Renderer;
+import static_meshes;
 
 version (Windows) {
   import basic.windows;
@@ -98,19 +99,114 @@ struct OpenGL_Data {
   u32 main_fbo;
   u32 main_fbo_color0;
   u32 main_fbo_depth;
+
+  u32 mesh_shader;
+  u32 mesh_vao;
+  u32 mesh_ibo;
 }
 
 __gshared OpenGL_Data opengl;
 
+extern(System) void opengl_debug_proc(u32 source, u32 type, u32 id, u32 severity, u32 length, const(char)* message, const(void)* param) {
+  opengl.log(message[0..length]);
+}
+
 void opengl_init(Platform_Renderer.Init_Data* init_data) {
   opengl.initted = opengl_platform_init(init_data);
   opengl.log = init_data.log;
+
+  debug {
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(&opengl_debug_proc, null);
+  }
 
   glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 
   glCreateFramebuffers(1, &opengl.main_fbo);
   glCreateRenderbuffers(1, &opengl.main_fbo_color0);
   glCreateRenderbuffers(1, &opengl.main_fbo_depth);
+
+  {
+    string vsrc =
+    `#version 450
+
+    layout(location = 0) in vec3 a_position;
+    layout(location = 2) in vec2 a_texcoord;
+
+    layout(location = 2) out vec2 f_texcoord;
+
+    void main() {
+      gl_Position = vec4(a_position, 1.0);
+      f_texcoord = a_texcoord;
+    }
+    `;
+    const(char)*[1] vsrcs = [vsrc.ptr];
+    u32 vshader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vshader, vsrcs.length, vsrcs.ptr, null);
+    glCompileShader(vshader);
+
+    string fsrc =
+    `#version 450
+
+    layout(location = 2) in vec2 f_texcoord;
+
+    layout(location = 0) out vec4 color;
+
+    void main() {
+      color = vec4(f_texcoord, 0.0, 1.0);
+    }
+    `;
+    const(char)*[1] fsrcs = [fsrc.ptr];
+    u32 fshader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fshader, fsrcs.length, fsrcs.ptr, null);
+    glCompileShader(fshader);
+
+    opengl.mesh_shader = glCreateProgram();
+    glAttachShader(opengl.mesh_shader, vshader);
+    glAttachShader(opengl.mesh_shader, fshader);
+    glLinkProgram(opengl.mesh_shader);
+    glDetachShader(opengl.mesh_shader, fshader);
+    glDetachShader(opengl.mesh_shader, vshader);
+
+    glDeleteShader(fshader);
+    glDeleteShader(vshader);
+  }
+
+  {
+    u32 mesh_vbo = void;
+    glCreateBuffers(1, &mesh_vbo);
+    glNamedBufferData(mesh_vbo, mesh_vertices.length * mesh_vertices[0].sizeof, mesh_vertices.ptr, GL_STATIC_DRAW);
+
+    u32 mesh_ebo = void;
+    glCreateBuffers(1, &mesh_ebo);
+    glNamedBufferData(mesh_ebo, mesh_indices.length * mesh_indices[0].sizeof, mesh_indices.ptr, GL_STATIC_DRAW);
+
+    glCreateBuffers(1, &opengl.mesh_ibo);
+    glNamedBufferData(opengl.mesh_ibo, mesh_instances.length * mesh_instances[0].sizeof, mesh_instances.ptr, GL_STATIC_DRAW);
+
+    u32 vbo_binding = 0;
+    u32 ibo_binding = 1;
+    glCreateVertexArrays(1, &opengl.mesh_vao);
+    glVertexArrayVertexBuffer(opengl.mesh_vao, vbo_binding, mesh_vbo, 0, Game_Mesh_Vertex.sizeof);
+    glVertexArrayVertexBuffer(opengl.mesh_vao, ibo_binding, opengl.mesh_ibo, 0, Game_Mesh_Instance.sizeof);
+    glVertexArrayBindingDivisor(opengl.mesh_vao, ibo_binding, 1);
+    glVertexArrayElementBuffer(opengl.mesh_vao, mesh_ebo);
+
+    u32 position_attrib = 0;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, position_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, position_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.mesh_vao, position_attrib, 3, GL_FLOAT, false, Game_Mesh_Vertex.position.offsetof);
+
+    u32 normal_attrib = 1;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, normal_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, normal_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.mesh_vao, normal_attrib, 3, GL_FLOAT, false, Game_Mesh_Vertex.normal.offsetof);
+
+    u32 texcoord_attrib = 2;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, texcoord_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, texcoord_attrib, vbo_binding);
+    glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, Game_Mesh_Vertex.texcoord.offsetof);
+  }
 }
 
 void opengl_deinit() {
@@ -150,8 +246,13 @@ void opengl_present(game.Game_Renderer* game_renderer) {
   glViewport(0, 0, opengl.size[0], opengl.size[1]);
   glDepthFunc(GL_LEQUAL);
   glEnable(GL_DEPTH_TEST);
+  glUseProgram(opengl.mesh_shader);
+  glBindVertexArray(opengl.mesh_vao);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, cast(void*) 0);
 
-  glClear(0); // NOTE(dfra): this fixes intel default framebuffer resize bug.
+  // NOTE(dfra): Clear(0) fixes intel default framebuffer resize bug.
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glClear(0);
 
   glEnable(GL_FRAMEBUFFER_SRGB);
   glBlitNamedFramebuffer(opengl.main_fbo, 0,
