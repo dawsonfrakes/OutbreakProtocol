@@ -21,4 +21,5 @@ void main(string[] args) {
 
   if (args.length > 1 && args[1] == "run") ".build/OutbreakProtocol.exe".spawnProcess;
   if (args.length > 1 && args[1] == "debug") "windbgx .build/OutbreakProtocol.exe".split.spawnProcess;
+  if (args.length > 1 && args[1] == "doc") "qrenderdoc .build/OutbreakProtocol.exe".split.spawnProcess;
 }

@@ -1,4 +1,5 @@
 import basic;
+import basic.maths;
 static import game;
 import renderer : Platform_Renderer;
 import static_meshes;
@@ -131,12 +132,16 @@ void opengl_init(Platform_Renderer.Init_Data* init_data) {
     `#version 450
 
     layout(location = 0) in vec3 a_position;
+    layout(location = 1) in vec3 a_normal;
     layout(location = 2) in vec2 a_texcoord;
+    layout(location = 3) in uint a_texture_index;
+    layout(location = 4) in mat4 i_world_transform;
+    layout(location = 8) in mat4 i_model_transform;
 
     layout(location = 2) out vec2 f_texcoord;
 
     void main() {
-      gl_Position = vec4(a_position, 1.0);
+      gl_Position = i_world_transform * vec4(a_position, 1.0);
       f_texcoord = a_texcoord;
     }
     `;
@@ -206,6 +211,25 @@ void opengl_init(Platform_Renderer.Init_Data* init_data) {
     glEnableVertexArrayAttrib(opengl.mesh_vao, texcoord_attrib);
     glVertexArrayAttribBinding(opengl.mesh_vao, texcoord_attrib, vbo_binding);
     glVertexArrayAttribFormat(opengl.mesh_vao, texcoord_attrib, 2, GL_FLOAT, false, game.Game_Mesh_Vertex.texcoord.offsetof);
+
+    u32 texture_index_attrib = 3;
+    glEnableVertexArrayAttrib(opengl.mesh_vao, texture_index_attrib);
+    glVertexArrayAttribBinding(opengl.mesh_vao, texture_index_attrib, vbo_binding);
+    glVertexArrayAttribIFormat(opengl.mesh_vao, texture_index_attrib, 1, GL_UNSIGNED_INT, game.Game_Mesh_Vertex.texture_index.offsetof);
+
+    enum world_transform_attrib = 4;
+    static foreach (i; world_transform_attrib..world_transform_attrib + 4) {
+      glEnableVertexArrayAttrib(opengl.mesh_vao, i);
+      glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, game.Game_Mesh_Instance.world_transform.offsetof + (i - world_transform_attrib) * v4.sizeof);
+    }
+
+    enum model_transform_attrib = 8;
+    static foreach (i; model_transform_attrib..model_transform_attrib + 4) {
+      glEnableVertexArrayAttrib(opengl.mesh_vao, i);
+      glVertexArrayAttribBinding(opengl.mesh_vao, i, ibo_binding);
+      glVertexArrayAttribFormat(opengl.mesh_vao, i, 4, GL_FLOAT, false, game.Game_Mesh_Instance.model_transform.offsetof + (i - model_transform_attrib) * v4.sizeof);
+    }
   }
 }
 
@@ -246,11 +270,13 @@ void opengl_present(game.Game_Renderer* game_renderer) {
 
   glBindFramebuffer(GL_FRAMEBUFFER, opengl.main_fbo);
   glViewport(0, 0, opengl.size[0], opengl.size[1]);
-  glDepthFunc(GL_LEQUAL);
+  glFrontFace(GL_CW);
+  glEnable(GL_CULL_FACE);
+  glDepthFunc(GL_GEQUAL);
   glEnable(GL_DEPTH_TEST);
   glUseProgram(opengl.mesh_shader);
   glBindVertexArray(opengl.mesh_vao);
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, cast(void*) 0);
+  glDrawElements(GL_TRIANGLES, mesh_indices.length, GL_UNSIGNED_SHORT, cast(void*) 0);
 
   // NOTE(dfra): Clear(0) fixes intel default framebuffer resize bug.
   glBindFramebuffer(GL_FRAMEBUFFER, 0);

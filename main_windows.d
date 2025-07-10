@@ -146,6 +146,11 @@ extern(Windows) noreturn WinMainCRTStartup() {
     CloseHandle(file);
   }
 
+  usize game_memory_size = 1 * 1024 * 1024 * 1024;
+  void* game_memory_ptr = VirtualAlloc(cast(void*) 0, game_memory_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+  assert(game_memory_ptr);
+  u8[] game_memory = (cast(u8*) game_memory_ptr)[0..game_memory_size];
+
   SetProcessDPIAware();
   WNDCLASSEXW wndclass;
   wndclass.cbSize = WNDCLASSEXW.sizeof;
@@ -256,11 +261,11 @@ extern(Windows) noreturn WinMainCRTStartup() {
     game.Game_Renderer game_renderer;
     version (DLL) {
       HMODULE lib = LoadLibraryW(".build/game.dll");
-      auto game_update_and_render = cast(typeof(game.game_update_and_render)*) GetProcAddress(lib, "game_update_and_render_");
-      game_update_and_render(&game_renderer);
+      auto game_update_and_render = cast(typeof(game.game_update_and_render_)*) GetProcAddress(lib, "game_update_and_render_");
+      game_update_and_render(game_memory, &game_renderer);
       FreeLibrary(lib);
     } else {
-      game.game_update_and_render(&game_renderer);
+      game.game_update_and_render(game_memory, &game_renderer);
     }
     platform_renderer.present(&game_renderer);
 

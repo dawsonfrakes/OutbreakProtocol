@@ -62,18 +62,6 @@ struct Bounded_Array(usize N_, T_) {
   }
 }
 
-auto min(Ts...)(Ts args) {
-  auto smallest = args[0];
-  static foreach (arg; args[1..$]) smallest = smallest < arg ? smallest : arg;
-  return smallest;
-}
-
-auto max(Ts...)(Ts args) {
-  auto largest = args[0];
-  static foreach (arg; args[1..$]) largest = largest > arg ? largest : arg;
-  return largest;
-}
-
 version (D_BetterC) {
   extern(C) f32* _memsetFloat(f32* p, f32 value, usize count) {
     f32* pstart = p;

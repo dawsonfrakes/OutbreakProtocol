@@ -33,6 +33,9 @@ enum GENERIC_READ = 0x80000000;
 enum OPEN_EXISTING = 3;
 enum FILE_ATTRIBUTE_NORMAL = 128;
 enum INVALID_HANDLE_VALUE = cast(HANDLE) -1;
+enum MEM_COMMIT = 0x00001000;
+enum MEM_RESERVE = 0x00002000;
+enum PAGE_READWRITE = 0x04;
 
 struct HINSTANCE__; alias HINSTANCE = HINSTANCE__*;
 alias HMODULE = HINSTANCE;
@@ -69,6 +72,7 @@ struct PROCESS_INFORMATION {
   HMODULE LoadLibraryW(const(wchar)*);
   PROC GetProcAddress(HMODULE, const(char)*);
   s32 FreeLibrary(HMODULE);
+  void* VirtualAlloc(void*, usize, u32, u32);
   s32 CreateProcessW(const(wchar)*, wchar*, void*, void*, s32, u32, void*, const(wchar)*, STARTUPINFOW*, PROCESS_INFORMATION*);
   s32 CloseHandle(HANDLE);
   s32 AllocConsole();

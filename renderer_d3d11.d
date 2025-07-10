@@ -74,7 +74,7 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
     D3D11_DEPTH_STENCIL_DESC depth_state_desc;
     depth_state_desc.DepthEnable = true;
     depth_state_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK.ALL;
-    depth_state_desc.DepthFunc = D3D11_COMPARISON_FUNC.LESS_EQUAL;
+    depth_state_desc.DepthFunc = D3D11_COMPARISON_FUNC.GREATER_EQUAL;
     hr = d3d11.device.CreateDepthStencilState(&depth_state_desc, &d3d11.depth_state);
     if (hr < 0) goto defer;
 
@@ -157,8 +157,8 @@ void d3d11_init(Platform_Renderer.Init_Data* init_data) {
 
       VOutput vmain(VInput input) {
         VOutput output;
-        output.position = float4(input.position, 1.0f);
-        output.normal = input.normal;
+        output.position = mul(float4(input.position, 1.0f), input.world_transform);
+        output.normal = mul(input.normal, (float3x3) input.model_transform);
         output.texcoord = input.texcoord;
         return output;
       }
@@ -424,7 +424,7 @@ void d3d11_present(game.Game_Renderer* game_renderer) {
   d3d11.ctx.IASetInputLayout(d3d11.mesh_input_layout);
   d3d11.ctx.VSSetShader(d3d11.mesh_vertex_shader, null, 0);
   d3d11.ctx.PSSetShader(d3d11.mesh_pixel_shader, null, 0);
-  d3d11.ctx.DrawIndexedInstanced(6, 1, 0, 0, 0);
+  d3d11.ctx.DrawIndexedInstanced(cast(u32) mesh_indices.length, cast(u32) game_renderer.meshes.length, 0, 0, 0);
 
   d3d11.ctx.ResolveSubresource(cast(ID3D11Resource*) d3d11.resolved_backbuffer, 0, cast(ID3D11Resource*) d3d11.multisampled_backbuffer, 0, DXGI_FORMAT.R16G16B16A16_FLOAT);
 
