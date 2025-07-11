@@ -20,3 +20,12 @@ struct uda {}
 @uda struct foreign {
   string library;
 }
+
+template ExportIfVersionDLLElseDefine(alias Exports) {
+  version (DLL) {
+    extern(C) export:
+    mixin Exports;
+  } else {
+    mixin Exports;
+  }
+}
