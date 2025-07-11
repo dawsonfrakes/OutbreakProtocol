@@ -9,11 +9,14 @@ void main(string[] args) {
   if (exit_code != 0) return;
   exit_code = "dmd -i -betterC -debug -g -version=DLL -of=.build/OutbreakProtocol.exe platform/main_windows -L=-incremental:no".split.spawnProcess.wait;
   if (exit_code != 0) return;
+  exit_code = "dmd -i -betterC -debug -g -of=.build/OutbreakProtocol_Static.exe platform/main_windows -L=-incremental:no".split.spawnProcess.wait;
+  if (exit_code != 0) return;
   if (args.length > 1) {
     switch (args[1]) {
-      case "run": ".build/OutbreakProtocol".spawnProcess; break;
-      case "debug": "windbgx .build/OutbreakProtocol".split.spawnProcess; break;
-      default: stderr.writeln("usage: rdmd build <run | debug>"); break;
+      case "run": ".build/OutbreakProtocol.exe".spawnProcess; break;
+      case "debug": "windbgx .build/OutbreakProtocol.exe".split.spawnProcess; break;
+      case "doc": "qrenderdoc .build/OutbreakProtocol.exe".split.spawnProcess; break;
+      default: stderr.writeln("usage: rdmd build <run | debug | doc>"); break;
     }
   }
 }
