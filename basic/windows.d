@@ -610,6 +610,10 @@ struct DXGI_SWAP_CHAIN_DESC {
   DXGI_SWAP_EFFECT SwapEffect;
   DXGI_SWAP_CHAIN_FLAG Flags;
 }
+enum DXGI_PRESENT_FLAGS : s32 {
+  NONE = 0,
+}
+alias DXGI_PRESENT = EnumFlags!DXGI_PRESENT_FLAGS;
 struct IDXGIObject {
   struct VTable {
     IUnknown.VTable iunknown_vtable;
@@ -633,12 +637,12 @@ struct IDXGISwapChain {
   struct VTable {
     IDXGIDeviceSubObject.VTable idxgidevicesubobject_vtable;
     alias this = idxgidevicesubobject_vtable;
-    void* Present;
+    extern(Windows) HRESULT function(IDXGISwapChain*, u32, u32) Present;
     void* GetBuffer;
     void* SetFullscreenState;
     void* GetFullscreenState;
     void* GetDesc;
-    void* ResizeBuffers;
+    extern(Windows) HRESULT function(IDXGISwapChain*, u32, u32, u32, DXGI_FORMAT, u32) ResizeBuffers;
     void* ResizeTarget;
     void* GetContainingOutput;
     void* GetFrameStatistics;

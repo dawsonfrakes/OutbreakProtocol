@@ -12,6 +12,14 @@ __gshared {
   u32 platform_dynamic_renderer_index;
 }
 
+PlatformRenderer.Init get_renderer_init_data() {
+  return PlatformRenderer.Init(hwnd: platform_hwnd, hdc: platform_hdc);
+}
+
+PlatformRenderer.Resize get_renderer_resize_data() {
+  return PlatformRenderer.Resize(width: platform_width, height: platform_height);
+}
+
 struct DynamicRenderer {
   const(wchar)[] path;
   const(char)[] name;
@@ -30,8 +38,8 @@ void set_platform_renderer(immutable(PlatformRenderer)* renderer) {
 void switch_platform_renderer(immutable(PlatformRenderer)* renderer) {
   platform_renderer_.deinit();
   set_platform_renderer(renderer);
-  platform_renderer_.init_();
-  platform_renderer_.resize();
+  platform_renderer_.init_(get_renderer_init_data());
+  platform_renderer_.resize(get_renderer_resize_data());
 }
 
 immutable(PlatformRenderer)* get_renderer_from_dll(DynamicRenderer* dyn) {
@@ -98,7 +106,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
         platform_width = cast(u16) lParam;
         platform_height = cast(u16) (lParam >> 16);
 
-        platform_renderer_.resize();
+        platform_renderer_.resize(get_renderer_resize_data());
         return 0;
       case WM_CREATE:
         platform_hwnd = hwnd;
@@ -116,7 +124,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
           import platform.renderer_d3d11 : d3d11_renderer;
           set_platform_renderer(&d3d11_renderer);
         }
-        platform_renderer_.init_();
+        platform_renderer_.init_(get_renderer_init_data());
         return 0;
       case WM_DESTROY:
         platform_renderer_.deinit();

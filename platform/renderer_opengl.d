@@ -1,7 +1,7 @@
 import basic;
 import platform.renderer;
 
-void opengl_init() {
+void opengl_init(PlatformRenderer.Init init_data) {
 
 }
 
@@ -9,7 +9,7 @@ void opengl_deinit() {
 
 }
 
-void opengl_resize() {
+void opengl_resize(PlatformRenderer.Resize resize_data) {
 
 }
 
