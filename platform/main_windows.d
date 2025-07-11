@@ -9,7 +9,18 @@ __gshared {
   u16 platform_width;
   u16 platform_height;
   immutable(PlatformRenderer)* platform_renderer_;
+  u32 platform_dynamic_renderer_index;
 }
+
+struct DynamicRenderer {
+  const(wchar)[] path;
+  const(char)[] name;
+  HMODULE loaded_lib = null;
+}
+__gshared DynamicRenderer[] dynamic_renderers = [
+  DynamicRenderer("renderer_d3d11.dll", "d3d11_renderer"),
+  DynamicRenderer("renderer_opengl.dll", "opengl_renderer"),
+];
 
 void set_platform_renderer(immutable(PlatformRenderer)* renderer) {
   platform_renderer_ = renderer;
@@ -23,11 +34,10 @@ void switch_platform_renderer(immutable(PlatformRenderer)* renderer) {
   platform_renderer_.resize();
 }
 
-immutable(PlatformRenderer)* get_renderer_from_dll(const(wchar)[] path, const(char)[] name) {
-  __gshared HMODULE lib;
-  if (lib) FreeLibrary(lib);
-  lib = LoadLibraryW(path.ptr);
-  if (lib) return cast(immutable(PlatformRenderer)*) GetProcAddress(lib, name.ptr);
+immutable(PlatformRenderer)* get_renderer_from_dll(DynamicRenderer* dyn) {
+  if (dyn.loaded_lib) FreeLibrary(dyn.loaded_lib);
+  dyn.loaded_lib = LoadLibraryW(dyn.path.ptr);
+  if (dyn.loaded_lib) return cast(immutable(PlatformRenderer)*) GetProcAddress(dyn.loaded_lib, dyn.name.ptr);
   return &null_renderer;
 }
 
@@ -100,7 +110,7 @@ extern(Windows) noreturn WinMainCRTStartup() {
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &round_mode, round_mode.sizeof);
 
         version (DLL) {
-          auto renderer = get_renderer_from_dll("renderer_d3d11.dll", "d3d11_renderer");
+          auto renderer = get_renderer_from_dll(&dynamic_renderers.ptr[0]);
           set_platform_renderer(renderer);
         } else {
           import platform.renderer_d3d11 : d3d11_renderer;
@@ -149,6 +159,12 @@ extern(Windows) noreturn WinMainCRTStartup() {
               if (wParam == VK_F4 && alt) DestroyWindow(platform_hwnd);
               if (wParam == VK_F11) toggle_fullscreen();
               if (wParam == VK_RETURN && alt) toggle_fullscreen();
+              debug if (wParam == VK_F6) {
+                platform_dynamic_renderer_index += 1;
+                platform_dynamic_renderer_index %= dynamic_renderers.length;
+                auto renderer = get_renderer_from_dll(&dynamic_renderers.ptr[platform_dynamic_renderer_index]);
+                switch_platform_renderer(renderer);
+              }
             }
           }
           break;

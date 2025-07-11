@@ -53,6 +53,7 @@ enum SWP_FRAMECHANGED = 0x0020;
 enum VK_RETURN = 0x0D;
 enum VK_MENU = 0x12;
 enum VK_F4 = 0x73;
+enum VK_F6 = 0x75;
 enum VK_F10 = 0x79;
 enum VK_F11 = 0x7A;
 
