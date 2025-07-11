@@ -4,6 +4,7 @@
 #load "renderer.jai";
 #load "renderer_d3d11.jai";
 #load "renderer_opengl.jai";
+game :: #import,file "../game/main.jai";
 
 platform_hinstance: HINSTANCE;
 platform_hwnd: HWND;
@@ -11,6 +12,14 @@ platform_hdc: HDC;
 platform_width: u16;
 platform_height: u16;
 platform_renderer_: *PlatformRenderer;
+
+get_renderer_init_data :: () -> PlatformRenderer.Init #no_context {
+  return .{hwnd=platform_hwnd, hdc=platform_hdc, width=platform_width, height=platform_height};
+}
+
+get_renderer_resize_data :: () -> PlatformRenderer.Resize #no_context {
+  return .{width=platform_width, height=platform_height};
+}
 
 set_platform_renderer :: (renderer: *PlatformRenderer) #no_context {
   platform_renderer_ = renderer;
@@ -20,8 +29,8 @@ set_platform_renderer :: (renderer: *PlatformRenderer) #no_context {
 switch_platform_renderer :: (renderer: *PlatformRenderer) #no_context {
   platform_renderer_.deinit();
   set_platform_renderer(renderer);
-  platform_renderer_.init();
-  platform_renderer_.resize();
+  platform_renderer_.init(get_renderer_init_data());
+  platform_renderer_.resize(get_renderer_resize_data());
 }
 
 toggle_fullscreen_save_placement := WINDOWPLACEMENT.{length=size_of(WINDOWPLACEMENT)};
@@ -79,7 +88,7 @@ clear_held_keys :: () #no_context {
         platform_width = cast,no_check(u16) lParam;
         platform_height = cast,no_check(u16) (lParam >> 16);
 
-        platform_renderer_.resize();
+        platform_renderer_.resize(get_renderer_resize_data());
       case WM_CREATE;
         platform_hwnd = hwnd;
         platform_hdc = GetDC(hwnd);
@@ -90,7 +99,8 @@ clear_held_keys :: () #no_context {
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, *round_mode, size_of(type_of(round_mode)));
 
         set_platform_renderer(*d3d11_renderer);
-        platform_renderer_.init();
+        // NOTE(dfra): platform_width/height are still zero here... do we care?
+        platform_renderer_.init(get_renderer_init_data());
       case WM_DESTROY;
         platform_renderer_.deinit();
 
@@ -108,7 +118,7 @@ clear_held_keys :: () #no_context {
   wndclass.hCursor = LoadCursorW(null, IDC_CROSS);
   wndclass.lpszClassName = u16.[#char "A", 0].data;
   RegisterClassExW(*wndclass);
-  CreateWindowExW(0, wndclass.lpszClassName, u16.[#char "O", #char "u", #char "t", #char "b", #char "r", #char "e", #char "a", #char "k", #char "P", #char "r", #char "o", #char "t", #char "o", #char "c", #char "o", #char "l", 0].data,
+  CreateWindowExW(0, wndclass.lpszClassName, u16.[#char "O", #char "u", #char "t", #char "b", #char "r", #char "e", #char "a", #char "k", #char " ", #char "P", #char "r", #char "o", #char "t", #char "o", #char "c", #char "o", #char "l", 0].data,
     WS_OVERLAPPEDWINDOW | WS_VISIBLE,
     CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
     null, null, platform_hinstance, null);
@@ -144,7 +154,9 @@ clear_held_keys :: () #no_context {
       }
     }
 
-    platform_renderer_.present();
+    game_renderer: game.Renderer;
+    game.update_and_render(*game_renderer);
+    platform_renderer_.present(.{width=platform_width, height=platform_height, renderer=*game_renderer});
 
     if sleep_is_granular {
       Sleep(1);
@@ -161,13 +173,13 @@ clear_held_keys :: () #no_context {
 #program_export memset :: (where: *void, what: s32, how_much: usize) -> *void #c_call {
   where8 := where.(*u8);
   what8 := what.(u8);
-  for 0..how_much where8[it] = what8;
+  for 1..how_much where8[it - 1] = what8;
   return where;
 }
 
 #program_export memcpy :: (to: *void, from: *void, how_much: usize) -> *void #c_call {
   to8 := to.(*u8);
   from8 := from.(*u8);
-  for 0..how_much to8[it] = from8[it];
+  for 1..how_much to8[it - 1] = from8[it - 1];
   return to;
 }

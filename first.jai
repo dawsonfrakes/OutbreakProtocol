@@ -51,7 +51,7 @@ build :: () {
               array_add(*cmd, sprint("-libpath:%\\ucrt\\x64", root));
               array_add(*cmd, sprint("-libpath:%\\um\\x64", root));
               array_add(*cmd, "-ignore:4216", "-nologo", "-noexp", "-noimplib");
-              array_add(*cmd, "-incremental:no", "-subsystem:windows");
+              array_add(*cmd, "-debug", "-incremental:no", "-subsystem:windows");
               array_add(*cmd, ..phase.compiler_generated_object_files);
               array_add(*cmd, ..phase.support_object_files);
               array_add(*cmd, ..system_libraries);
