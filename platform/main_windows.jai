@@ -1,29 +1,28 @@
 #import "Basic2";
 #import "Windows2";
 
-game :: #import,file "../game/main.jai";
+#load "renderer_d3d11.jai";
 
 platform_hinstance: HINSTANCE;
 platform_hwnd: HWND;
 platform_hdc: HDC;
 platform_width: u16;
 platform_height: u16;
+platform_save_placement := WINDOWPLACEMENT.{length=size_of(WINDOWPLACEMENT)};
 
 utf16lez :: ($s: string) -> [s.count + 1]u16 {
   result: [s.count + 1]u16;
   for s result[it_index] = it;
-  result[s.count] = 0;
   return result;
 }
 
-toggle_fullscreen_save_placement := WINDOWPLACEMENT.{length=size_of(WINDOWPLACEMENT)};
 toggle_fullscreen :: () #no_context {
   style := GetWindowLongPtrW(platform_hwnd, GWL_STYLE);
   if style & WS_OVERLAPPEDWINDOW {
     mi := MONITORINFO.{cbSize=size_of(MONITORINFO)};
     GetMonitorInfoW(MonitorFromWindow(platform_hwnd, MONITOR_DEFAULTTOPRIMARY), *mi);
 
-    GetWindowPlacement(platform_hwnd, *toggle_fullscreen_save_placement);
+    GetWindowPlacement(platform_hwnd, *platform_save_placement);
     SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
     SetWindowPos(platform_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
       mi.rcMonitor.right - mi.rcMonitor.left,
@@ -31,7 +30,7 @@ toggle_fullscreen :: () #no_context {
       SWP_FRAMECHANGED);
   } else {
     SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
-    SetWindowPlacement(platform_hwnd, *toggle_fullscreen_save_placement);
+    SetWindowPlacement(platform_hwnd, *platform_save_placement);
     SetWindowPos(platform_hwnd, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE |
       SWP_NOZORDER | SWP_FRAMECHANGED);
   }
@@ -45,7 +44,7 @@ clear_held_keys :: () #no_context {
 
 }
 
-WinMainCRTStartup :: () -> noreturn #c_call {
+WinMainCRTStartup :: () #c_call {
   platform_hinstance = GetModuleHandleW(null);
 
   wsadata: WSADATA = ---;
@@ -70,6 +69,8 @@ WinMainCRTStartup :: () -> noreturn #c_call {
       case WM_SIZE;
         platform_width = cast,no_check(u16) lParam;
         platform_height = cast,no_check(u16) (lParam >> 16);
+
+        renderer_d3d11.resize();
       case WM_CREATE;
         platform_hwnd = hwnd;
         platform_hdc = GetDC(hwnd);
@@ -78,7 +79,11 @@ WinMainCRTStartup :: () -> noreturn #c_call {
         DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, *dark_mode, size_of(type_of(dark_mode)));
         round_mode: s32 = DWMWCP_DONOTROUND;
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, *round_mode, size_of(type_of(round_mode)));
+
+        renderer_d3d11.init();
       case WM_DESTROY;
+        renderer_d3d11.deinit();
+
         PostQuitMessage(0);
       case WM_SYSCOMMAND;
         if wParam == SC_KEYMENU return 0;
@@ -91,9 +96,9 @@ WinMainCRTStartup :: () -> noreturn #c_call {
   wndclass.hInstance = platform_hinstance;
   wndclass.hIcon = LoadIconW(null, IDI_WARNING);
   wndclass.hCursor = LoadCursorW(null, IDC_CROSS);
-  wndclass.lpszClassName = u16.[#char "A", 0].data;
+  wndclass.lpszClassName = (#run utf16lez("A")).data;
   RegisterClassExW(*wndclass);
-  CreateWindowExW(0, wndclass.lpszClassName, u16.[#char "O", #char "u", #char "t", #char "b", #char "r", #char "e", #char "a", #char "k", #char " ", #char "P", #char "r", #char "o", #char "t", #char "o", #char "c", #char "o", #char "l", 0].data,
+  CreateWindowExW(0, wndclass.lpszClassName, (#run utf16lez("Outbreak Protocol")).data,
     WS_OVERLAPPEDWINDOW | WS_VISIBLE,
     CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
     null, null, platform_hinstance, null);
@@ -127,20 +132,7 @@ WinMainCRTStartup :: () -> noreturn #c_call {
       }
     }
 
-    game_renderer: game.Renderer;
-
-    #if DYNAMIC {
-      game_dll := LoadLibraryW((#run utf16lez(".build/game.dll")).data);
-      update_and_render :=
-        cast(type_of(game.update_and_render))
-        GetProcAddress(game_dll, "update_and_render");
-    } else {
-      update_and_render :: game.update_and_render;
-    }
-
-    update_and_render(*game_renderer);
-
-    #if DYNAMIC FreeLibrary(game_dll);
+    renderer_d3d11.present();
 
     if sleep_is_granular {
       Sleep(1);
