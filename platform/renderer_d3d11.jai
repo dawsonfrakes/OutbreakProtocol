@@ -31,6 +31,20 @@ d3d11_init :: () #no_context {
       *d3d11.swapchain, *d3d11.device, null, *d3d11.ctx);
     if hr < 0 return hr;
 
+    dxgi_device: *IDXGIDevice = ---;
+    if d3d11.swapchain.GetDevice(d3d11.swapchain, *IDXGIDevice_UUID, xx *dxgi_device) >= 0 {
+      dxgi_adapter: *IDXGIAdapter = ---;
+      if dxgi_device.GetAdapter(dxgi_device, *dxgi_adapter) >= 0 {
+        dxgi_factory: *IDXGIFactory = ---;
+        if dxgi_adapter.GetParent(dxgi_adapter, *IDXGIFactory_UUID, xx *dxgi_factory) >= 0 {
+          dxgi_factory.MakeWindowAssociation(dxgi_factory, platform_hwnd, .NO_ALT_ENTER);
+          dxgi_factory.Release(dxgi_factory);
+        }
+        dxgi_adapter.Release(dxgi_adapter);
+      }
+      dxgi_device.Release(dxgi_device);
+    }
+
     d3d11.initted = true;
     return 0;
   }
@@ -95,6 +109,7 @@ d3d11_present :: () #no_context {
     hr: HRESULT = ---;
 
     d3d11.ctx.ClearRenderTargetView(d3d11.ctx, d3d11.swapchain_backbuffer_view, f32.[0.6, 0.2, 0.2, 1.0].data);
+    d3d11.ctx.ClearDepthStencilView(d3d11.ctx, d3d11.depthbuffer_view, .DEPTH, 0.0, 0);
 
     hr = d3d11.swapchain.Present(d3d11.swapchain, 1, 0);
     if hr < 0 return hr;

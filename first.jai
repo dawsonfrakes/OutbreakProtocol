@@ -60,6 +60,7 @@ build :: () {
             array_add(*cmd, sprint("-libpath:%\\ucrt\\x64", root));
             array_add(*cmd, sprint("-libpath:%\\um\\x64", root));
             array_add(*cmd, "-nologo", "-debug", "-incremental:no", "-nodefaultlib", "-subsystem:windows");
+            array_add(*cmd, "-alternatename:_fltused=memset");
             array_add(*cmd, sprint("-entry:WinMainCRTStartup%", entry_suffix));
             array_add(*cmd, ..phase.compiler_generated_object_files);
             array_add(*cmd, ..phase.support_object_files);

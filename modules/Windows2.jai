@@ -374,6 +374,10 @@ D3D11_SUBRESOURCE_DATA :: struct {
   SysMemPitch: u32;
   SysMemSlicePitch: u32;
 }
+D3D11_CLEAR_FLAG :: enum_flags u32 {
+  DEPTH :: 0x1;
+  STENCIL :: 0x2;
+}
 ID3D11Device_VTable :: struct {
   using iunknown_vtable: IUnknown_VTable;
   CreateBuffer: *void;
@@ -480,7 +484,7 @@ ID3D11DeviceContext_VTable :: struct {
   ClearRenderTargetView: (*ID3D11DeviceContext, *ID3D11RenderTargetView, *f32) #cpp_method;
   ClearUnorderedAccessViewUint: *void;
   ClearUnorderedAccessViewFloat: *void;
-  ClearDepthStencilView: *void;
+  ClearDepthStencilView: (*ID3D11DeviceContext, *ID3D11DepthStencilView, D3D11_CLEAR_FLAG, f32, u8) #cpp_method;
   GenerateMips: *void;
   SetResourceMinLOD: *void;
   GetResourceMinLOD: *void;
@@ -593,6 +597,9 @@ ID3D11DepthStencilView :: struct {
 D3D11CreateDeviceAndSwapChain :: (adapter: *IDXGIAdapter, driver: D3D_DRIVER_TYPE, software: HMODULE, flags: D3D11_CREATE_DEVICE_FLAG, feature_levels: *D3D_FEATURE_LEVEL, feature_levels_count: u32, sdk_version: u32, swapchain_desc: *DXGI_SWAP_CHAIN_DESC, swapchain: **IDXGISwapChain, device: **ID3D11Device, feature_level: *D3D_FEATURE_LEVEL, ctx: **ID3D11DeviceContext) -> HRESULT #foreign D3D11;
 
 dxgi :: #library,system "dxgi";
+
+IDXGIFactory_UUID :: IID.{0x7B7166EC, 0x21C7, 0x44AE, .[0xB2, 0x1A, 0xC9, 0xAE, 0x32, 0x1A, 0xE3, 0x69]};
+IDXGIDevice_UUID :: IID.{0x54EC77FA, 0x1377, 0x44E6, .[0x8C, 0x32, 0x88, 0xFD, 0x5F, 0x44, 0xC8, 0x4C]};
 
 DXGI_FORMAT :: enum u32 {
   UNKNOWN :: 0;
@@ -784,6 +791,11 @@ DXGI_SWAP_CHAIN_DESC :: struct {
   SwapEffect: DXGI_SWAP_EFFECT;
   Flags: DXGI_SWAP_CHAIN_FLAG;
 }
+DXGI_MWA :: enum_flags u32 {
+  NO_WINDOW_CHANGES :: 1 << 0;
+  NO_ALT_ENTER :: 1 << 1;
+  NO_PRINT_SCREEN :: 1 << 2;
+}
 IDXGIObject_VTable :: struct {
   using iunknown_vtable: IUnknown_VTable;
   SetPrivateData: (*IDXGIObject, *GUID, u32, *void) -> HRESULT #cpp_method;
@@ -795,6 +807,18 @@ IDXGIObject :: struct {
   #as iunknown: IUnknown;
   #place iunknown; using _idxgiobject_vtable: *IDXGIObject_VTable;
 }
+IDXGIFactory_VTable :: struct {
+  using idxgiobject_vtable: IDXGIObject_VTable;
+  EnumAdapters: *void;
+  MakeWindowAssociation: (*IDXGIFactory, HWND, DXGI_MWA) -> HRESULT #cpp_method;
+  GetWindowAssociation: *void;
+  CreateSwapChain: *void;
+  CreateSoftwareAdapter: *void;
+}
+IDXGIFactory :: struct {
+  #as idxgiobject: IDXGIObject;
+  #place idxgiobject; using _idxgifactory_vtable: *IDXGIFactory_VTable;
+}
 IDXGIAdapter_VTable :: struct {
   using idxgiobject_vtable: IDXGIObject_VTable;
   EnumOutputs: *void;
@@ -805,9 +829,21 @@ IDXGIAdapter :: struct {
   #as idxgiobject: IDXGIObject;
   #place idxgiobject; using _idxgiadapter_vtable: *IDXGIAdapter_VTable;
 }
+IDXGIDevice_VTable :: struct {
+  using idxgiobject_vtable: IDXGIObject_VTable;
+  GetAdapter: (*IDXGIDevice, **IDXGIAdapter) -> HRESULT #cpp_method;
+  CreateSurface: *void;
+  QueryResourceResidency: *void;
+  SetGPUThreadPriority: *void;
+  GetGPUThreadPriority: *void;
+}
+IDXGIDevice :: struct {
+  #as idxgiobject: IDXGIObject;
+  #place idxgiobject; using _idxgidevice_vtable: *IDXGIDevice_VTable;
+}
 IDXGIDeviceSubObject_VTable :: struct {
   using idxgiobject_vtable: IDXGIObject_VTable;
-  GetDevice: *void;
+  GetDevice: (*IDXGIDeviceSubObject, *IID, **void) -> HRESULT #cpp_method;
 }
 IDXGIDeviceSubObject :: struct {
   #as idxgiobject: IDXGIObject;
