@@ -9,8 +9,12 @@ d3d11: struct {
   using swapchain_objects: struct {
     swapchain_backbuffer: *ID3D11Texture2D;
     swapchain_backbuffer_view: *ID3D11RenderTargetView;
+    multisampled_backbuffer: *ID3D11Texture2D;
+    multisampled_backbuffer_view: *ID3D11RenderTargetView;
     depthbuffer: *ID3D11Texture2D;
     depthbuffer_view: *ID3D11DepthStencilView;
+    // resolved_backbuffer: *ID3D11Texture2D;
+    // resolved_backbuffer_view: *ID3D11ShaderResourceView;
   };
 }
 
@@ -54,6 +58,8 @@ d3d11_init :: () #no_context {
 d3d11_swapchain_deinit :: () #no_context {
   if d3d11.depthbuffer_view d3d11.depthbuffer_view.Release(d3d11.depthbuffer_view);
   if d3d11.depthbuffer d3d11.depthbuffer.Release(d3d11.depthbuffer);
+  if d3d11.multisampled_backbuffer_view d3d11.multisampled_backbuffer_view.Release(d3d11.multisampled_backbuffer_view);
+  if d3d11.multisampled_backbuffer d3d11.multisampled_backbuffer.Release(d3d11.multisampled_backbuffer);
   if d3d11.swapchain_backbuffer_view d3d11.swapchain_backbuffer_view.Release(d3d11.swapchain_backbuffer_view);
   if d3d11.swapchain_backbuffer d3d11.swapchain_backbuffer.Release(d3d11.swapchain_backbuffer);
   d3d11.swapchain_objects = .{};
@@ -83,13 +89,30 @@ d3d11_resize :: () #no_context {
     hr = d3d11.device.CreateRenderTargetView(d3d11.device, d3d11.swapchain_backbuffer, null, *d3d11.swapchain_backbuffer_view);
     if hr < 0 return hr;
 
+    samples :: 4;
+
+    multisampled_backbuffer_desc: D3D11_TEXTURE2D_DESC;
+    multisampled_backbuffer_desc.Width = platform_width;
+    multisampled_backbuffer_desc.Height = platform_height;
+    multisampled_backbuffer_desc.MipLevels = 1;
+    multisampled_backbuffer_desc.ArraySize = 1;
+    multisampled_backbuffer_desc.Format = .R16G16B16A16_FLOAT;
+    multisampled_backbuffer_desc.SampleDesc.Count = samples;
+    multisampled_backbuffer_desc.Usage = .DEFAULT;
+    multisampled_backbuffer_desc.BindFlags = .RENDER_TARGET;
+    hr = d3d11.device.CreateTexture2D(d3d11.device, *multisampled_backbuffer_desc, null, *d3d11.multisampled_backbuffer);
+    if hr < 0 return hr;
+
+    hr = d3d11.device.CreateRenderTargetView(d3d11.device, d3d11.multisampled_backbuffer, null, *d3d11.multisampled_backbuffer_view);
+    if hr < 0 return hr;
+
     depthbuffer_desc: D3D11_TEXTURE2D_DESC;
     depthbuffer_desc.Width = platform_width;
     depthbuffer_desc.Height = platform_height;
     depthbuffer_desc.MipLevels = 1;
     depthbuffer_desc.ArraySize = 1;
     depthbuffer_desc.Format = .D32_FLOAT;
-    depthbuffer_desc.SampleDesc.Count = 1;
+    depthbuffer_desc.SampleDesc.Count = samples;
     depthbuffer_desc.Usage = .DEFAULT;
     depthbuffer_desc.BindFlags = .DEPTH_STENCIL;
     hr = d3d11.device.CreateTexture2D(d3d11.device, *depthbuffer_desc, null, *d3d11.depthbuffer);
