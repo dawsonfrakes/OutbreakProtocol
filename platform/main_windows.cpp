@@ -21,14 +21,25 @@ static void platform_toggle_fullscreen(void) {
   static WINDOWPLACEMENT save_placement = {size_of(WINDOWPLACEMENT)};
   ssize style = GetWindowLongPtrW(platform_hwnd, GWL_STYLE);
   if (style & WS_OVERLAPPEDWINDOW) {
+    MONITORINFO mi = {size_of(MONITORINFO)};
+    GetMonitorInfoW(MonitorFromWindow(platform_hwnd, MONITOR_DEFAULTTOPRIMARY), &mi);
 
+    GetWindowPlacement(platform_hwnd, &save_placement);
+    SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+    SetWindowPos(platform_hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+      mi.rcMonitor.right - mi.rcMonitor.left,
+      mi.rcMonitor.bottom - mi.rcMonitor.top,
+      SWP_FRAMECHANGED);
   } else {
-
+    SetWindowLongPtrW(platform_hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+    SetWindowPlacement(platform_hwnd, &save_placement);
+    SetWindowPos(platform_hwnd, null, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE |
+      SWP_NOZORDER | SWP_FRAMECHANGED);
   }
 }
 
 static void platform_update_cursor_clip(void) {
-
+  ClipCursor(null);
 }
 
 static void platform_clear_held_keys(void) {

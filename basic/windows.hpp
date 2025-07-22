@@ -45,6 +45,10 @@ typedef ssize (WINAPI*PROC)(void);
 #define GWL_STYLE (-16)
 #define HWND_TOP cast(HWND, 0)
 #define MONITOR_DEFAULTTOPRIMARY 1
+#define SWP_NOSIZE 0x0001
+#define SWP_NOMOVE 0x0002
+#define SWP_NOZORDER 0x0004
+#define SWP_FRAMECHANGED 0x0020
 #define SC_KEYMENU 0xF100
 #define VK_RETURN 0x0D
 #define VK_MENU 0x12
@@ -102,6 +106,12 @@ struct WINDOWPLACEMENT {
   RECT rcNormalPosition;
   RECT rcDevice;
 };
+struct MONITORINFO {
+  u32 cbSize;
+  RECT rcMonitor;
+  RECT rcWork;
+  u32 dwFlags;
+};
 
 #define USER32_FUNCTIONS(X) \
   X(s32, SetProcessDPIAware, void) \
@@ -117,8 +127,14 @@ struct WINDOWPLACEMENT {
   X(s32, ValidateRect, HWND, RECT*) \
   X(s32, DestroyWindow, HWND) \
   X(HDC, GetDC, HWND) \
+  X(s32, ClipCursor, RECT*) \
   X(ssize, GetWindowLongPtrW, HWND, s32) \
-  X(ssize, SetWindowLongPtrW, HWND, s32, ssize)
+  X(ssize, SetWindowLongPtrW, HWND, s32, ssize) \
+  X(s32, GetWindowPlacement, HWND, WINDOWPLACEMENT*) \
+  X(s32, SetWindowPlacement, HWND, WINDOWPLACEMENT*) \
+  X(s32, SetWindowPos, HWND, HWND, s32, s32, s32, s32, u32) \
+  X(HMONITOR, MonitorFromWindow, HWND, u32) \
+  X(s32, GetMonitorInfoW, HMONITOR, MONITORINFO*)
 
 // Ws2_32
 #define WSADESCRIPTION_LEN 256
