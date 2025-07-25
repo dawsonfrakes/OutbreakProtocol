@@ -37,8 +37,24 @@ enum WM_PAINT = 0x000F;
 enum WM_QUIT = 0x0012;
 enum WM_ERASEBKGND = 0x0014;
 enum WM_ACTIVATEAPP = 0x001C;
+enum WM_KEYDOWN = 0x0100;
+enum WM_KEYUP = 0x0101;
+enum WM_SYSKEYDOWN = 0x0104;
+enum WM_SYSKEYUP = 0x0105;
 enum WM_SYSCOMMAND = 0x0112;
 enum SC_KEYMENU = 0xF100;
+enum GWL_STYLE = -16;
+enum MONITOR_DEFAULTTOPRIMARY = 1;
+enum HWND_TOP = cast(HWND) 0;
+enum SWP_NOSIZE = 0x0001;
+enum SWP_NOMOVE = 0x0002;
+enum SWP_NOZORDER = 0x0004;
+enum SWP_FRAMECHANGED = 0x0020;
+enum VK_RETURN = 0x0D;
+enum VK_MENU = 0x12;
+enum VK_F4 = 0x73;
+enum VK_F10 = 0x79;
+enum VK_F11 = 0x7A;
 
 struct HDC__;
 alias HDC = HDC__*;
@@ -88,6 +104,21 @@ struct MSG {
   POINT pt;
   u32 lPrivate;
 }
+struct WINDOWPLACEMENT {
+  u32 length;
+  u32 flags;
+  u32 showCmd;
+  POINT ptMinPosition;
+  POINT ptMaxPosition;
+  RECT rcNormalPosition;
+  RECT rcDevice;
+}
+struct MONITORINFO {
+  u32 cbSize;
+  RECT rcMonitor;
+  RECT rcWork;
+  u32 dwFlags;
+}
 
 @foreign("User32") extern(Windows) {
   s32 SetProcessDPIAware();
@@ -98,9 +129,19 @@ struct MSG {
   s32 PeekMessageW(MSG*, HWND, u32, u32, u32);
   s32 TranslateMessage(const(MSG)*);
   ssize DispatchMessageW(const(MSG)*);
-  HDC GetDC(HWND);
   ssize DefWindowProcW(HWND, u32, usize, ssize);
   void PostQuitMessage(s32);
+  s32 DestroyWindow(HWND);
+  HDC GetDC(HWND);
+  s32 ValidateRect(HWND, const(RECT)*);
+  s32 ClipCursor(const(RECT)*);
+  ssize GetWindowLongPtrW(HWND, s32);
+  ssize SetWindowLongPtrW(HWND, s32, ssize);
+  s32 GetWindowPlacement(HWND, WINDOWPLACEMENT*);
+  s32 SetWindowPlacement(HWND, const(WINDOWPLACEMENT)*);
+  s32 SetWindowPos(HWND, HWND, s32, s32, s32, s32, u32);
+  HMONITOR MonitorFromWindow(HWND, u32);
+  s32 GetMonitorInfoW(HMONITOR, MONITORINFO*);
 }
 
 // Ws2_32
