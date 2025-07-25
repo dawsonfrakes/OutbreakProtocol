@@ -1,32 +1,28 @@
 import basic;
-import basic.windows;
+mixin(import_dynamic("basic.windows", attributes: ["__gshared"], except: ["Kernel32"]));
 
 __gshared {
   HINSTANCE platform_hinstance;
 }
 
 extern(Windows) noreturn WinMainCRTStartup() {
+  auto User32_dll = LoadLibraryW("USER32.DLL");
+  static foreach (member; __traits(allMembers, basic.windows)) {
+    static if (has_uda!(foreign, __traits(getMember, basic.windows, member)) &&
+     !string_equal!(get_uda!(foreign, __traits(getMember, basic.windows, member)).library, "Kernel32"))
+    {
+      mixin(member~` = cast(typeof(`~member~`)) GetProcAddress(`~get_uda!(foreign, __traits(getMember, basic.windows, member)).library~`_dll, "`~member~`");`);
+    }
+  }
+
   platform_hinstance = GetModuleHandleW(null);
 
   SetProcessDPIAware();
-  WNDCLASSEXW wndclass;
-  wndclass.cbSize = WNDCLASSEXW.sizeof;
-  wndclass.style = CS_OWNDC;
-  wndclass.lpfnWndProc = (hwnd, message, wParam, lParam) {
-    switch (message) {
-      case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-      default:
-        return DefWindowProcW(hwnd, message, wParam, lParam);
-    }
-  };
-  wndclass.lpszClassName = "A";
-  RegisterClassExW(&wndclass);
 
   ExitProcess(0);
 }
 
+extern(Windows) s32 _fltused;
+
 pragma(linkerDirective, "-subsystem:windows");
 pragma(lib, "Kernel32");
-pragma(lib, "User32");
